@@ -30,7 +30,7 @@ program
 
     console.log(`Found ${ir.operations.length} operations, ${ir.schemas.length} schemas`)
 
-    writeGeneratedFiles(ir, outputPath)
+    writeGeneratedFiles(ir, outputPath, { mock: options.mock })
 
     console.log(`Generated files written to ${outputPath}`)
   })

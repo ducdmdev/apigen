@@ -26,28 +26,6 @@ npx apigen generate --input ./openapi.yaml --output ./src/api/generated
 
 That reads your OpenAPI 3.x or Swagger 2.0 spec (YAML or JSON), and writes generated files to `./src/api/generated`.
 
-### Config file usage
-
-Create `oqf.config.ts` in your project root:
-
-```ts
-import { defineConfig } from 'apigen'
-
-export default defineConfig({
-  input: './openapi.yaml',
-  output: './src/api/generated', // default
-  mock: true,                    // default — generates mock data
-})
-```
-
-Then run:
-
-```bash
-npx apigen generate --input ./openapi.yaml
-```
-
-> **Note:** CLI flags override config file values when both are provided.
-
 ## Generated Output Structure
 
 ```

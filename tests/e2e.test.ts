@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { resolve, join } from 'path'
-import { mkdtempSync, readFileSync, rmSync } from 'fs'
+import { mkdtempSync, readFileSync, rmSync, existsSync } from 'fs'
 import { tmpdir } from 'os'
 import { loadSpec } from '../src/loader'
 import { extractIR } from '../src/ir'
@@ -51,6 +51,31 @@ describe('e2e: OpenAPI 3.0 petstore', () => {
       const hooks = readFileSync(join(outDir, 'hooks.ts'), 'utf8')
       expect(hooks).toContain('useQuery')
       expect(hooks).toContain('useMutation')
+    } finally {
+      rmSync(outDir, { recursive: true })
+    }
+  })
+})
+
+describe('e2e: --no-mock flag', () => {
+  it('generates only types, hooks, and index when mock is false', async () => {
+    const spec = await loadSpec(resolve(__dirname, 'fixtures/petstore-oas3.yaml'))
+    const ir = extractIR(spec)
+    const outDir = mkdtempSync(join(tmpdir(), 'oqf-e2e-'))
+
+    try {
+      writeGeneratedFiles(ir, outDir, { mock: false })
+
+      expect(existsSync(join(outDir, 'types.ts'))).toBe(true)
+      expect(existsSync(join(outDir, 'hooks.ts'))).toBe(true)
+      expect(existsSync(join(outDir, 'index.ts'))).toBe(true)
+      expect(existsSync(join(outDir, 'mocks.ts'))).toBe(false)
+      expect(existsSync(join(outDir, 'test-mode-provider.tsx'))).toBe(false)
+
+      const hooks = readFileSync(join(outDir, 'hooks.ts'), 'utf8')
+      expect(hooks).toContain('useQuery')
+      expect(hooks).toContain('useMutation')
+      expect(hooks).not.toContain('useApiTestMode')
     } finally {
       rmSync(outDir, { recursive: true })
     }

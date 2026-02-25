@@ -54,4 +54,18 @@ describe('generateHooks', () => {
     expect(output).toContain("from './mocks'")
     expect(output).toContain("from './types'")
   })
+
+  it('omits mock imports and test mode when mock is false', async () => {
+    const spec = await loadSpec(resolve(__dirname, '../fixtures/petstore-oas3.yaml'))
+    const ir = extractIR(spec)
+    const output = generateHooks(ir, { mock: false })
+
+    expect(output).toContain("from '@tanstack/react-query'")
+    expect(output).toContain("from './types'")
+    expect(output).not.toContain("from './test-mode-provider'")
+    expect(output).not.toContain("from './mocks'")
+    expect(output).not.toContain('useApiTestMode')
+    expect(output).not.toContain('testMode')
+    expect(output).toContain('apiFetch')
+  })
 })

@@ -41,6 +41,22 @@ describe('extractIR', () => {
     expect(pet!.required).toContain('name')
   })
 
+  it('preserves digits in fallback operationId', () => {
+    const spec = {
+      paths: {
+        '/v2/users': {
+          get: {
+            responses: { '200': { description: 'ok' } },
+          },
+        },
+      },
+      components: { schemas: {} },
+    }
+    const ir = extractIR(spec as Record<string, unknown>)
+    const op = ir.operations[0]
+    expect(op.operationId).toBe('get_v2_users')
+  })
+
   it('extracts response schema references', async () => {
     const spec = await loadSpec(resolve(__dirname, 'fixtures/petstore-oas3.yaml'))
     const ir = extractIR(spec)

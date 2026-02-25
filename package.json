@@ -25,7 +25,10 @@
     "swagger2openapi": "^7.0.0",
     "yaml": "^2.0.0"
   },
-  "peerDependencies": {},
+  "peerDependencies": {
+    "react": "^18",
+    "@tanstack/react-query": "^5"
+  },
   "engines": {
     "node": ">=18"
   }

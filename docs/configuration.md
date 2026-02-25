@@ -7,7 +7,7 @@ All the ways to configure apigen: config file, CLI flags, and defaults.
 Use `defineConfig` in a TypeScript config file to get type-checked configuration:
 
 ```ts
-// oqf.config.ts
+// apigen.config.ts
 import { defineConfig } from 'apigen'
 
 export default defineConfig({
@@ -87,7 +87,7 @@ defineConfig({
 })
 ```
 
-> **Note:** Even when `mock` is `false`, the `mocks.ts` file is still written (the hooks import from it). To fully disable mock behavior at runtime, do not wrap your app in `<ApiTestModeProvider enabled>`.
+> **Note:** When `mock` is `false`, the `mocks.ts` and `test-mode-provider.tsx` files are not generated, and hooks do not include test mode logic.
 
 ## CLI Flags
 

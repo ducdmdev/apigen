@@ -30,4 +30,33 @@ describe('writeGeneratedFiles', () => {
       rmSync(outDir, { recursive: true })
     }
   })
+
+  it('skips mocks and provider when mock is false', async () => {
+    const spec = await loadSpec(resolve(__dirname, 'fixtures/petstore-oas3.yaml'))
+    const ir = extractIR(spec)
+    const outDir = mkdtempSync(join(tmpdir(), 'oqf-test-'))
+
+    try {
+      writeGeneratedFiles(ir, outDir, { mock: false })
+
+      expect(existsSync(join(outDir, 'types.ts'))).toBe(true)
+      expect(existsSync(join(outDir, 'hooks.ts'))).toBe(true)
+      expect(existsSync(join(outDir, 'index.ts'))).toBe(true)
+      expect(existsSync(join(outDir, 'mocks.ts'))).toBe(false)
+      expect(existsSync(join(outDir, 'test-mode-provider.tsx'))).toBe(false)
+
+      const indexContent = readFileSync(join(outDir, 'index.ts'), 'utf8')
+      expect(indexContent).toContain("export * from './types'")
+      expect(indexContent).toContain("export * from './hooks'")
+      expect(indexContent).not.toContain("export * from './mocks'")
+      expect(indexContent).not.toContain("export * from './test-mode-provider'")
+
+      const hooksContent = readFileSync(join(outDir, 'hooks.ts'), 'utf8')
+      expect(hooksContent).not.toContain('useApiTestMode')
+      expect(hooksContent).not.toContain("from './mocks'")
+      expect(hooksContent).not.toContain("from './test-mode-provider'")
+    } finally {
+      rmSync(outDir, { recursive: true })
+    }
+  })
 })

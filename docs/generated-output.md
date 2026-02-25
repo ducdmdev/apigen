@@ -133,8 +133,7 @@ export interface GetUserParams {
 The file imports from four sources:
 
 ```ts
-import { useQuery, type UseQueryOptions } from '@tanstack/react-query'
-import { useMutation, type UseMutationOptions } from '@tanstack/react-query'
+import { useQuery, type UseQueryOptions, useMutation, type UseMutationOptions } from '@tanstack/react-query'
 import { useApiTestMode } from './test-mode-provider'
 import { mockGetUserResponse, mockCreateUserResponse, /* ... */ } from './mocks'
 import type { User, GetUserParams, CreateUserBody, /* ... */ } from './types'
@@ -267,7 +266,7 @@ For each schema in the IR, apigen emits a `mock<SchemaName>` constant of that sc
 | `string` | `'string'` |
 | `number` (integer or number) | `1` |
 | `boolean` | `true` |
-| `array` (of T) | Single-element array, e.g. `[1]` for `number[]`, `['string']` for `string[]` |
+| `array` (of T) | Single-element array, e.g. `[1]` for `number[]`, `['string']` for `string[]`. If array items have no type, an empty array `[]` is used. |
 | `enum` | First enum value, e.g. `'active'` for `enum: [active, inactive]` |
 | `$ref` to another schema | Reference to that schema's mock constant, e.g. `mockProfile` |
 | anything else | `'unknown'` |
@@ -297,7 +296,8 @@ For each operation that has a response schema, apigen emits a `mock<OperationId>
 
 - If the response is a `$ref` to a schema (e.g. `User`), the mock aliases the schema mock: `export const mockGetUserResponse: User = mockUser`
 - If the response is an array of `$ref` items, it wraps in an array: `export const mockListUsersResponse: User[] = [mockUser]`
-- If the response has no `$ref`, no mock is emitted.
+- If the response is an array without a `$ref` for items, an `unknown[] = []` mock is generated.
+- If the response has no `$ref` and is not an array, no mock is emitted.
 
 #### Example
 

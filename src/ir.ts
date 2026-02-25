@@ -98,7 +98,7 @@ function extractIR(spec: Record<string, unknown>): IR {
       const op = pathItem[method] as Record<string, unknown> | undefined
       if (!op) continue
 
-      const operationId = (op.operationId as string) ?? `${method}${path.replace(/[^a-zA-Z]/g, '_')}`
+      const operationId = (op.operationId as string) ?? `${method}${path.replace(/[^a-zA-Z0-9]/g, '_')}`
       const parameters = (op.parameters ?? []) as Array<Record<string, unknown>>
 
       const pathParams: IRParam[] = []

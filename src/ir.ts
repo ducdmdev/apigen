@@ -141,6 +141,17 @@ function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
+function extractArrayItems(schema: Record<string, unknown>): Record<string, unknown> | undefined {
+  // Direct array — items on the schema itself
+  if (schema.type === 'array') return schema.items as Record<string, unknown> | undefined
+  // anyOf with array variant — dig into the array variant's items
+  if (Array.isArray(schema.anyOf)) {
+    const arrayVariant = (schema.anyOf as Record<string, unknown>[]).find(v => v.type === 'array')
+    if (arrayVariant) return arrayVariant.items as Record<string, unknown> | undefined
+  }
+  return undefined
+}
+
 function resolveInternalRef(ref: string, allProps: Record<string, Record<string, unknown>>): Record<string, unknown> | null {
   // Handle internal $ref like "#/properties/includeFields"
   const match = ref.match(/^#\/properties\/(.+)$/)
@@ -162,7 +173,12 @@ function extractInlineSchema(name: string, schema: Record<string, unknown>): IRS
     }
 
     const isArray = resolved.type === 'array' || mapOpenApiType(resolved) === 'array'
-    const items = resolved.items as Record<string, unknown> | undefined
+    let items = extractArrayItems(resolved)
+    // Resolve internal $ref in array items (e.g. items: {$ref: "#/properties/otherField"})
+    if (items?.$ref && typeof items.$ref === 'string') {
+      const itemTarget = resolveInternalRef(items.$ref as string, props)
+      if (itemTarget) items = itemTarget
+    }
     // Only keep $ref if it's a components schema ref, not an internal one
     const ref = resolved.$ref as string | undefined
     const isComponentRef = ref && ref.startsWith('#/components/')
@@ -272,8 +288,8 @@ function extractIR(spec: Record<string, unknown>): IR {
     const required = (schemaDef.required ?? []) as string[]
 
     const properties: IRProperty[] = Object.entries(props).map(([propName, propSchema]) => {
-      const isArray = propSchema.type === 'array'
-      const items = propSchema.items as Record<string, unknown> | undefined
+      const isArray = propSchema.type === 'array' || mapOpenApiType(propSchema) === 'array'
+      const items = extractArrayItems(propSchema)
       return {
         name: propName,
         type: mapOpenApiType(propSchema),

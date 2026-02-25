@@ -217,9 +217,11 @@ describe('extractIR', () => {
     const excludeField = bodySchema!.properties.find(p => p.name === 'excludeFields')!
     expect(excludeField.ref).toBeNull()
     expect(excludeField.type).toBe('array')
+    expect(excludeField.itemType).toBe('string')
     // includeFields should be array (anyOf [string, array<string>] → array)
     const includeField = bodySchema!.properties.find(p => p.name === 'includeFields')!
     expect(includeField.type).toBe('array')
+    expect(includeField.itemType).toBe('string')
   })
 
   it('resolves anyOf nullable types to base type', () => {

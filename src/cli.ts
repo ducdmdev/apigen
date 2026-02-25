@@ -9,7 +9,7 @@ import { writeGeneratedFiles } from './writer'
 const program = new Command()
 
 program
-  .name('apigen')
+  .name('apigen-tanstack')
   .description('Generate TanStack Query hooks from OpenAPI/Swagger specs')
   .version('0.1.0')
 

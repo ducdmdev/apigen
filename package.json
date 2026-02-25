@@ -1,33 +1,59 @@
 {
-  "name": "apigen",
+  "name": "apigen-tanstack",
   "version": "0.1.0",
+  "description": "Generate TanStack Query v5 React hooks from OpenAPI/Swagger specs with built-in test mode",
+  "keywords": [
+    "openapi",
+    "swagger",
+    "tanstack-query",
+    "react-query",
+    "codegen",
+    "hooks",
+    "typescript"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tini-works/apigen"
+  },
+  "author": "tini-works",
+  "license": "MIT",
   "type": "module",
-  "bin": {
-    "apigen": "./dist/cli.js"
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "apigen-tanstack": "./dist/cli.js",
+    "apigen": "./dist/cli.js"
+  },
   "files": ["dist"],
   "scripts": {
-    "build": "bun build ./src/cli.ts --outdir dist --target node",
+    "build": "bun build ./src/cli.ts --outdir dist --target node && bun build ./src/index.ts --outdir dist --target node --format esm && tsc --emitDeclarationOnly --outDir dist",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "bun run typecheck && bun test && bun run build"
   },
   "devDependencies": {
     "typescript": "^5.9.0",
     "vitest": "^3.0.0",
-    "@types/node": "^22.0.0"
-  },
-  "dependencies": {
+    "@types/node": "^22.0.0",
     "commander": "^13.0.0",
     "@redocly/openapi-core": "^1.0.0",
     "swagger2openapi": "^7.0.0",
     "yaml": "^2.0.0"
   },
   "peerDependencies": {
-    "react": "^18",
+    "react": "^18 || ^19",
     "@tanstack/react-query": "^5"
+  },
+  "peerDependenciesMeta": {
+    "react": { "optional": true },
+    "@tanstack/react-query": { "optional": true }
   },
   "engines": {
     "node": ">=18"

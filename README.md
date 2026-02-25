@@ -1,17 +1,17 @@
-# apigen
+# apigen-tanstack
 
 Generate TanStack Query v5 React hooks from OpenAPI/Swagger specs with built-in test mode.
 
 ## Install
 
 ```bash
-npm install -D apigen
+npm install -D apigen-tanstack
 ```
 
 ## Usage
 
 ```bash
-npx apigen generate --input ./openapi.yaml --output ./src/api/generated
+npx apigen-tanstack generate --input ./openapi.yaml --output ./src/api/generated
 ```
 
 ## Generated Files

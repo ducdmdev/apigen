@@ -38,3 +38,12 @@ import { ApiTestModeProvider } from './api/generated'
 
 - OpenAPI 3.0+
 - Swagger 2.0 (auto-converted to OpenAPI 3.0)
+
+## Documentation
+
+- [Getting Started](docs/getting-started.md) — Installation, quick start, and first code generation
+- [Configuration](docs/configuration.md) — Config file reference and CLI flags
+- [Generated Output](docs/generated-output.md) — File-by-file walkthrough of what apigen produces
+- [Architecture](docs/architecture.md) — Pipeline design, IR spec, and generator internals
+- [API Reference](docs/api-reference.md) — Public API for programmatic usage
+- [Contributing](docs/contributing.md) — Development setup, project structure, and how to extend

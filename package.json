@@ -1,0 +1,32 @@
+{
+  "name": "apigen",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "apigen": "./dist/cli.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "bun build ./src/cli.ts --outdir dist --target node",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0",
+    "vitest": "^3.0.0",
+    "@types/node": "^22.0.0"
+  },
+  "dependencies": {
+    "commander": "^13.0.0",
+    "@redocly/openapi-core": "^1.0.0",
+    "swagger2openapi": "^7.0.0",
+    "yaml": "^2.0.0"
+  },
+  "peerDependencies": {},
+  "engines": {
+    "node": ">=18"
+  }
+}

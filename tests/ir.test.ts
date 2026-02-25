@@ -41,7 +41,7 @@ describe('extractIR', () => {
     expect(pet!.required).toContain('name')
   })
 
-  it('preserves digits in fallback operationId', () => {
+  it('generates smart fallback operationId from path', () => {
     const spec = {
       paths: {
         '/v2/users': {
@@ -54,7 +54,7 @@ describe('extractIR', () => {
     }
     const ir = extractIR(spec as Record<string, unknown>)
     const op = ir.operations[0]
-    expect(op.operationId).toBe('get_v2_users')
+    expect(op.operationId).toBe('listUsers')
   })
 
   it('extracts response schema references', async () => {
@@ -64,5 +64,158 @@ describe('extractIR', () => {
     const listPets = ir.operations.find(op => op.operationId === 'listPets')
     expect(listPets!.responseSchema).toBeDefined()
     expect(listPets!.responseSchema!.type).toBe('array')
+  })
+
+  it('generates smart operationId with action suffixes', () => {
+    const spec = {
+      paths: {
+        '/masterdata/bg-insurance/search': { post: { responses: { '200': { description: 'ok' } } } },
+        '/masterdata/bg-insurance/get-by-id': { post: { responses: { '200': { description: 'ok' } } } },
+        '/masterdata/bg-insurance/get-by-ids': { post: { responses: { '200': { description: 'ok' } } } },
+        '/masterdata/bg-insurance/get-by-query': { post: { responses: { '200': { description: 'ok' } } } },
+        '/masterdata/sdebm/upsert': { post: { responses: { '200': { description: 'ok' } } } },
+        '/masterdata/sdebm/delete': { post: { responses: { '200': { description: 'ok' } } } },
+        '/masterdata/sdav': { get: { responses: { '200': { description: 'ok' } } } },
+        '/masterdata/sdav': { post: { responses: { '200': { description: 'ok' } } } },
+      },
+      components: { schemas: {} },
+    }
+    const ir = extractIR(spec as Record<string, unknown>)
+    const ids = ir.operations.map(op => op.operationId)
+
+    expect(ids).toContain('searchBgInsurance')
+    expect(ids).toContain('getByIdBgInsurance')
+    expect(ids).toContain('getByIdsBgInsurance')
+    expect(ids).toContain('getByQueryBgInsurance')
+    expect(ids).toContain('upsertSdebm')
+    expect(ids).toContain('deleteSdebm')
+    expect(ids).toContain('postSdav')
+  })
+
+  it('extracts inline request body schemas', () => {
+    const spec = {
+      paths: {
+        '/users/search': {
+          post: {
+            operationId: 'searchUsers',
+            requestBody: {
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    required: ['query'],
+                    properties: {
+                      query: { type: 'string' },
+                      limit: { type: 'integer' },
+                    },
+                  },
+                },
+              },
+            },
+            responses: { '200': { description: 'ok' } },
+          },
+        },
+      },
+      components: { schemas: {} },
+    }
+    const ir = extractIR(spec as Record<string, unknown>)
+
+    const bodySchema = ir.schemas.find(s => s.name === 'SearchUsersBody')
+    expect(bodySchema).toBeDefined()
+    expect(bodySchema!.properties).toHaveLength(2)
+    expect(bodySchema!.properties.find(p => p.name === 'query')!.type).toBe('string')
+    expect(bodySchema!.properties.find(p => p.name === 'query')!.required).toBe(true)
+    expect(bodySchema!.properties.find(p => p.name === 'limit')!.type).toBe('number')
+
+    const op = ir.operations[0]
+    expect(op.requestBody!.ref).toBe('#/components/schemas/SearchUsersBody')
+  })
+
+  it('extracts inline response schemas', () => {
+    const spec = {
+      paths: {
+        '/users/search': {
+          post: {
+            operationId: 'searchUsers',
+            requestBody: { content: { 'application/json': { schema: { type: 'object' } } } },
+            responses: {
+              '200': {
+                description: 'ok',
+                content: {
+                  'application/json': {
+                    schema: {
+                      type: 'object',
+                      required: ['statusCode'],
+                      properties: {
+                        data: { type: 'array', items: { type: 'object' } },
+                        message: { type: 'string' },
+                        statusCode: { type: 'number' },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      components: { schemas: {} },
+    }
+    const ir = extractIR(spec as Record<string, unknown>)
+
+    const respSchema = ir.schemas.find(s => s.name === 'SearchUsersResponse')
+    expect(respSchema).toBeDefined()
+    expect(respSchema!.properties).toHaveLength(3)
+    expect(respSchema!.properties.find(p => p.name === 'statusCode')!.required).toBe(true)
+    expect(respSchema!.properties.find(p => p.name === 'data')!.isArray).toBe(true)
+
+    const op = ir.operations[0]
+    expect(op.responseSchema!.ref).toBe('#/components/schemas/SearchUsersResponse')
+  })
+
+  it('does not create inline schema when $ref already exists', async () => {
+    const spec = await loadSpec(resolve(__dirname, 'fixtures/petstore-oas3.yaml'))
+    const ir = extractIR(spec)
+
+    // Petstore has $ref for request body — should NOT create inline schema
+    const createPet = ir.operations.find(op => op.operationId === 'createPet')
+    expect(createPet!.requestBody!.ref).toBe('#/components/schemas/CreatePetBody')
+    // Should still have exactly 2 schemas from components (Pet, CreatePetBody)
+    expect(ir.schemas.filter(s => s.name === 'Pet' || s.name === 'CreatePetBody')).toHaveLength(2)
+  })
+
+  it('resolves anyOf nullable types to base type', () => {
+    const spec = {
+      paths: {
+        '/items': {
+          post: {
+            operationId: 'createItem',
+            requestBody: {
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      name: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+                      code: { anyOf: [{ type: 'string' }, { enum: ['null'], nullable: true }] },
+                      count: { anyOf: [{ type: 'number' }, { not: {} }] },
+                    },
+                  },
+                },
+              },
+            },
+            responses: { '200': { description: 'ok' } },
+          },
+        },
+      },
+      components: { schemas: {} },
+    }
+    const ir = extractIR(spec as Record<string, unknown>)
+
+    const bodySchema = ir.schemas.find(s => s.name === 'CreateItemBody')
+    expect(bodySchema).toBeDefined()
+    expect(bodySchema!.properties.find(p => p.name === 'name')!.type).toBe('string')
+    expect(bodySchema!.properties.find(p => p.name === 'code')!.type).toBe('string')
+    expect(bodySchema!.properties.find(p => p.name === 'count')!.type).toBe('number')
   })
 })

@@ -1,0 +1,101 @@
+openapi: "3.0.3"
+info:
+  title: Masterdata-style API
+  version: "1.0"
+paths:
+  /masterdata/bg-insurance/search:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - query
+              properties:
+                query:
+                  type: string
+                year:
+                  anyOf:
+                    - type: number
+                    - type: "null"
+                active:
+                  type: boolean
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - statusCode
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                  message:
+                    type: string
+                  statusCode:
+                    type: number
+  /masterdata/bg-insurance/get-by-id:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - id
+              properties:
+                id:
+                  type: number
+      responses:
+        "200":
+          description: Single result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                  message:
+                    type: string
+  /masterdata/sdav:
+    get:
+      responses:
+        "200":
+          description: List
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+  /masterdata/sdebm/upsert:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                code:
+                  anyOf:
+                    - type: string
+                    - enum: ["null"]
+                      nullable: true
+      responses:
+        "200":
+          description: Upserted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean

@@ -32,4 +32,12 @@ describe('generateMocks', () => {
 
     expect(output).toContain("import type { Pet")
   })
+
+  it('skips empty type import when no schemas exist', () => {
+    const ir = { operations: [], schemas: [] }
+    const output = generateMocks(ir)
+
+    expect(output).not.toContain('import type')
+    expect(output).not.toContain('import type {  }')
+  })
 })

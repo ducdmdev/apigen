@@ -76,9 +76,11 @@ function generateMocks(ir: IR): string {
     usedTypes.add(schema.name)
   }
 
-  const importLine = `import type { ${[...usedTypes].join(', ')} } from './types'`
-  parts.push(importLine)
-  parts.push('')
+  if (usedTypes.size > 0) {
+    const importLine = `import type { ${[...usedTypes].join(', ')} } from './types'`
+    parts.push(importLine)
+    parts.push('')
+  }
 
   for (const schema of ir.schemas) {
     parts.push(generateSchemaMock(schema, ir.schemas))

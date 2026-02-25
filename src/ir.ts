@@ -60,6 +60,9 @@ function mapOpenApiType(schema: Record<string, unknown>): string {
     // Multiple real types with same base → use that type
     const mapped = realTypes.map(v => mapOpenApiType(v))
     if (new Set(mapped).size === 1) return mapped[0]
+    // Zod pattern: anyOf [string, array<string>] → treat as array
+    const hasArray = realTypes.find(v => v.type === 'array')
+    if (hasArray && realTypes.length === 2) return 'array'
     return 'unknown'
   }
 
@@ -138,22 +141,39 @@ function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
+function resolveInternalRef(ref: string, allProps: Record<string, Record<string, unknown>>): Record<string, unknown> | null {
+  // Handle internal $ref like "#/properties/includeFields"
+  const match = ref.match(/^#\/properties\/(.+)$/)
+  if (!match) return null
+  return allProps[match[1]] ?? null
+}
+
 function extractInlineSchema(name: string, schema: Record<string, unknown>): IRSchema | null {
   const props = (schema.properties ?? {}) as Record<string, Record<string, unknown>>
   if (Object.keys(props).length === 0) return null
 
   const required = (schema.required ?? []) as string[]
   const properties: IRProperty[] = Object.entries(props).map(([propName, propSchema]) => {
-    const isArray = propSchema.type === 'array' || mapOpenApiType(propSchema) === 'array'
-    const items = propSchema.items as Record<string, unknown> | undefined
+    // Resolve internal $ref (Zod pattern: {$ref: "#/properties/otherField"})
+    let resolved = propSchema
+    if (propSchema.$ref && typeof propSchema.$ref === 'string') {
+      const target = resolveInternalRef(propSchema.$ref as string, props)
+      if (target) resolved = target
+    }
+
+    const isArray = resolved.type === 'array' || mapOpenApiType(resolved) === 'array'
+    const items = resolved.items as Record<string, unknown> | undefined
+    // Only keep $ref if it's a components schema ref, not an internal one
+    const ref = resolved.$ref as string | undefined
+    const isComponentRef = ref && ref.startsWith('#/components/')
     return {
       name: propName,
-      type: mapOpenApiType(propSchema),
+      type: mapOpenApiType(resolved),
       required: required.includes(propName),
       isArray,
       itemType: isArray && items ? mapOpenApiType(items) : null,
-      ref: (propSchema.$ref as string) ?? null,
-      enumValues: (propSchema.enum as string[]) ?? null,
+      ref: isComponentRef ? ref : null,
+      enumValues: (resolved.enum as string[]) ?? null,
     }
   })
 

@@ -184,6 +184,44 @@ describe('extractIR', () => {
     expect(ir.schemas.filter(s => s.name === 'Pet' || s.name === 'CreatePetBody')).toHaveLength(2)
   })
 
+  it('resolves internal $ref to sibling property', () => {
+    const spec = {
+      paths: {
+        '/items': {
+          post: {
+            operationId: 'listItems',
+            requestBody: {
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      includeFields: { anyOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }, { not: {} }] },
+                      excludeFields: { $ref: '#/properties/includeFields' },
+                    },
+                  },
+                },
+              },
+            },
+            responses: { '200': { description: 'ok' } },
+          },
+        },
+      },
+      components: { schemas: {} },
+    }
+    const ir = extractIR(spec as Record<string, unknown>)
+
+    const bodySchema = ir.schemas.find(s => s.name === 'ListItemsBody')
+    expect(bodySchema).toBeDefined()
+    // excludeFields should resolve to same type as includeFields, not "includeFields"
+    const excludeField = bodySchema!.properties.find(p => p.name === 'excludeFields')!
+    expect(excludeField.ref).toBeNull()
+    expect(excludeField.type).toBe('array')
+    // includeFields should be array (anyOf [string, array<string>] → array)
+    const includeField = bodySchema!.properties.find(p => p.name === 'includeFields')!
+    expect(includeField.type).toBe('array')
+  })
+
   it('resolves anyOf nullable types to base type', () => {
     const spec = {
       paths: {

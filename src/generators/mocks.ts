@@ -79,6 +79,8 @@ function mockPropertyValue(prop: IRProperty, schemas: IRSchema[]): string {
   if (prop.enumValues && prop.enumValues.length > 0) {
     return `'${prop.enumValues[0]}'`
   }
+  if (prop.type === 'object') return '{}'
+  if (prop.type === 'unknown') return 'null as unknown'
   return fakerValueForField(prop.name, prop.type)
 }
 

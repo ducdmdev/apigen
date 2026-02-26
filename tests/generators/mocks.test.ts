@@ -115,4 +115,24 @@ describe('generateMocks', () => {
     expect(output).toContain('data: {},')
     expect(output).toContain('meta: null as unknown,')
   })
+
+  it('generates {} for object-typed properties even when name matches faker heuristic', () => {
+    const ir: IR = {
+      operations: [],
+      schemas: [{
+        name: 'Insurance',
+        properties: [
+          { name: 'address', type: 'object', required: false, isArray: false, itemType: null, ref: null, enumValues: null },
+          { name: 'contact', type: 'object', required: false, isArray: false, itemType: null, ref: null, enumValues: null },
+        ],
+        required: [],
+      }],
+    }
+    const output = generateMocks(ir)
+
+    expect(output).toContain('address: {},')
+    expect(output).toContain('contact: {},')
+    expect(output).not.toMatch(/address: '/)
+    expect(output).not.toMatch(/contact: '/)
+  })
 })

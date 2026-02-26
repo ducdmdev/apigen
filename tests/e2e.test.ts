@@ -196,6 +196,32 @@ describe('e2e: --split flag', () => {
   })
 })
 
+describe('e2e: allOf composition', () => {
+  it('generates correct types from allOf spec', async () => {
+    const spec = await loadSpec(resolve(__dirname, 'fixtures/allof-composition.yaml'))
+    const ir = extractIR(spec)
+    const outDir = mkdtempSync(join(tmpdir(), 'oqf-e2e-'))
+
+    try {
+      writeGeneratedFiles(ir, outDir)
+
+      const types = readFileSync(join(outDir, 'types.ts'), 'utf8')
+      // User should have merged properties from BaseEntity + inline
+      expect(types).toContain('export interface User')
+      expect(types).toContain('id: string')
+      expect(types).toContain('createdAt?: string')
+      expect(types).toContain('name: string')
+      expect(types).toContain('email?: string')
+
+      const hooks = readFileSync(join(outDir, 'hooks.ts'), 'utf8')
+      expect(hooks).toContain('useListUsers')
+      expect(hooks).toContain('useCreateUser')
+    } finally {
+      rmSync(outDir, { recursive: true })
+    }
+  })
+})
+
 describe('e2e: --no-mock flag', () => {
   it('generates only types, hooks, and index when mock is false', async () => {
     const spec = await loadSpec(resolve(__dirname, 'fixtures/petstore-oas3.yaml'))

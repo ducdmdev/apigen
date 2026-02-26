@@ -2,13 +2,15 @@
 
 import { Command } from 'commander'
 import { resolve, dirname, join } from 'path'
-import { readFileSync } from 'fs'
-import { fileURLToPath } from 'url'
+import { existsSync, readFileSync } from 'fs'
+import { fileURLToPath, pathToFileURL } from 'url'
 import { select, input } from '@inquirer/prompts'
 import { loadSpec } from './loader'
 import { extractIR } from './ir'
 import { writeGeneratedFiles } from './writer'
 import { discoverSpec } from './discover'
+import { resolveConfig } from './config'
+import type { ConfigInput } from './config'
 
 async function promptForInput(): Promise<string> {
   const source = await select({
@@ -50,6 +52,22 @@ async function promptForInput(): Promise<string> {
   return result.url
 }
 
+async function loadConfigFile(configPath: string): Promise<ConfigInput> {
+  const resolved = resolve(configPath)
+  if (!existsSync(resolved)) {
+    throw new Error(`Config file not found: ${configPath}`)
+  }
+  const module = await import(pathToFileURL(resolved).toString())
+  return module.default ?? module
+}
+
+function findConfigFile(): string | null {
+  for (const name of ['apigen.config.ts', 'apigen.config.js']) {
+    if (existsSync(resolve(name))) return resolve(name)
+  }
+  return null
+}
+
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf-8'))
 
@@ -67,11 +85,35 @@ program
   .option('-o, --output <path>', 'Output directory', './src/api/generated')
   .option('--no-mock', 'Skip mock data generation')
   .option('--split', 'Split output into per-tag feature folders')
-  .action(async (options: { input?: string; output: string; mock: boolean; split?: boolean }) => {
-    const inputValue = options.input ?? (await promptForInput())
+  .option('-c, --config <path>', 'Path to config file (searches for apigen.config.ts by default)')
+  .option('--base-url <url>', 'Base URL prefix for all API fetch paths')
+  .action(async (options: { input?: string; output: string; mock: boolean; split?: boolean; config?: string; baseUrl?: string }) => {
+    // Load config file (explicit or auto-search)
+    let fileConfig: ConfigInput | null = null
+    if (options.config) {
+      fileConfig = await loadConfigFile(options.config)
+    } else {
+      const found = findConfigFile()
+      if (found) {
+        console.log(`Using config file: ${found}`)
+        fileConfig = await loadConfigFile(found)
+      }
+    }
+
+    // Merge: CLI flags override config file
+    const config = resolveConfig({
+      input: options.input ?? fileConfig?.input ?? '',
+      output: options.output !== './src/api/generated' ? options.output : (fileConfig?.output ?? options.output),
+      mock: options.mock !== undefined ? options.mock : fileConfig?.mock,
+      split: options.split ?? fileConfig?.split,
+      baseURL: options.baseUrl ?? fileConfig?.baseURL,
+      apiFetchImportPath: fileConfig?.apiFetchImportPath,
+    })
+
+    const inputValue = config.input || (await promptForInput())
     const isUrlInput = inputValue.startsWith('http://') || inputValue.startsWith('https://')
     const inputPath = isUrlInput ? inputValue : resolve(inputValue)
-    const outputPath = resolve(options.output)
+    const outputPath = resolve(config.output)
 
     console.log(`Reading spec from ${inputPath}`)
 
@@ -80,7 +122,12 @@ program
 
     console.log(`Found ${ir.operations.length} operations, ${ir.schemas.length} schemas`)
 
-    writeGeneratedFiles(ir, outputPath, { mock: options.mock, split: options.split })
+    writeGeneratedFiles(ir, outputPath, {
+      mock: config.mock,
+      split: config.split,
+      baseURL: config.baseURL,
+      apiFetchImportPath: config.apiFetchImportPath,
+    })
 
     console.log(`Generated files written to ${outputPath}`)
   })

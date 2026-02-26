@@ -6,6 +6,7 @@ import { generateHooks } from './generators/hooks'
 import { generateMocks } from './generators/mocks'
 import { generateProvider } from './generators/provider'
 import { generateIndexFile, generateRootIndexFile } from './generators/index-file'
+import { generateApiFetch } from './generators/api-fetch'
 
 function tagSlug(tag: string): string {
   return tag.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
@@ -70,6 +71,9 @@ function writeSplit(ir: IR, outputDir: string, mock: boolean): void {
     writeFileSync(join(outputDir, 'test-mode-provider.tsx'), generateProvider(), 'utf8')
   }
 
+  // Write shared api-fetch at root
+  writeFileSync(join(outputDir, 'api-fetch.ts'), generateApiFetch(), 'utf8')
+
   // Write per-tag feature folders
   for (const slug of tagSlugs) {
     const ops = groups.get(slug)!
@@ -80,13 +84,13 @@ function writeSplit(ir: IR, outputDir: string, mock: boolean): void {
     writeFileSync(join(featureDir, 'types.ts'), generateTypes(subsetIR), 'utf8')
     writeFileSync(
       join(featureDir, 'hooks.ts'),
-      generateHooks(subsetIR, { mock, providerImportPath: '../test-mode-provider' }),
+      generateHooks(subsetIR, { mock, providerImportPath: '../test-mode-provider', apiFetchImportPath: '../api-fetch' }),
       'utf8',
     )
     if (mock) {
       writeFileSync(join(featureDir, 'mocks.ts'), generateMocks(subsetIR), 'utf8')
     }
-    writeFileSync(join(featureDir, 'index.ts'), generateIndexFile({ mock }), 'utf8')
+    writeFileSync(join(featureDir, 'index.ts'), generateIndexFile({ mock, includeProvider: false }), 'utf8')
   }
 
   // Write root index that re-exports all feature folders

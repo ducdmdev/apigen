@@ -63,7 +63,7 @@ function mapOpenApiType(schema: Record<string, unknown>): string {
     // Zod pattern: anyOf [string, array<string>] → treat as array
     const hasArray = realTypes.find(v => v.type === 'array')
     if (hasArray && realTypes.length === 2) return 'array'
-    return 'unknown'
+    return mapped.join(' | ')
   }
 
   const type = schema.type as string | undefined
@@ -103,8 +103,15 @@ function generateOperationId(method: string, path: string): string {
   const action = actionSuffixes[lastSegment]
 
   if (action && segments.length >= 2) {
-    const resource = kebabToPascal(segments[segments.length - 2])
-    return `${action}${resource}`
+    let resourceIndex = segments.length - 2
+    let versionSuffix = ''
+    // Skip version-like segments (v1, v2, etc.) to find the real resource name
+    if (/^v\d+$/i.test(segments[resourceIndex]) && resourceIndex > 0) {
+      versionSuffix = kebabToPascal(segments[resourceIndex])
+      resourceIndex--
+    }
+    const resource = kebabToPascal(segments[resourceIndex])
+    return `${action}${resource}${versionSuffix}`
   }
 
   // No known action suffix — use method as verb

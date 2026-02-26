@@ -181,9 +181,10 @@ function collectMockImports(ir: IR): string[] {
   return [...mocks]
 }
 
-function generateHooks(ir: IR, options?: { mock?: boolean; providerImportPath?: string }): string {
+function generateHooks(ir: IR, options?: { mock?: boolean; providerImportPath?: string; apiFetchImportPath?: string }): string {
   const mock = options?.mock ?? true
   const providerImportPath = options?.providerImportPath ?? './test-mode-provider'
+  const apiFetchImportPath = options?.apiFetchImportPath
   const parts: string[] = []
   const queryOps = ir.operations.filter(op => op.method === 'get')
   const mutationOps = ir.operations.filter(op => op.method !== 'get')
@@ -206,18 +207,23 @@ function generateHooks(ir: IR, options?: { mock?: boolean; providerImportPath?: 
   if (typeImports.length > 0) {
     parts.push(`import type { ${typeImports.join(', ')} } from './types'`)
   }
+  if (apiFetchImportPath) {
+    parts.push(`import { apiFetch } from '${apiFetchImportPath}'`)
+  }
   parts.push('')
 
-  parts.push(`function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {`)
-  parts.push(`  return fetch(path, {`)
-  parts.push(`    headers: { 'Content-Type': 'application/json' },`)
-  parts.push(`    ...init,`)
-  parts.push(`  }).then(res => {`)
-  parts.push(`    if (!res.ok) throw new Error(\`\${res.status} \${res.statusText}\`)`)
-  parts.push(`    return res.json() as Promise<T>`)
-  parts.push(`  })`)
-  parts.push(`}`)
-  parts.push('')
+  if (!apiFetchImportPath) {
+    parts.push(`function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {`)
+    parts.push(`  return fetch(path, {`)
+    parts.push(`    headers: { 'Content-Type': 'application/json' },`)
+    parts.push(`    ...init,`)
+    parts.push(`  }).then(res => {`)
+    parts.push(`    if (!res.ok) throw new Error(\`\${res.status} \${res.statusText}\`)`)
+    parts.push(`    return res.json() as Promise<T>`)
+    parts.push(`  })`)
+    parts.push(`}`)
+    parts.push('')
+  }
 
   for (const op of queryOps) {
     parts.push(generateQueryHook(op, mock))

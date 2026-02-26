@@ -256,6 +256,20 @@ describe('extractIR', () => {
     expect(bodySchema!.properties.find(p => p.name === 'data')!.type).toBe('number | string | boolean')
   })
 
+  it('skips version segment in operationId generation', () => {
+    const spec = {
+      paths: {
+        '/masterdata/sdkrw/v2/get-by-query': { post: { responses: { '200': { description: 'ok' } } } },
+        '/api/v1/users/search': { post: { responses: { '200': { description: 'ok' } } } },
+      },
+      components: { schemas: {} },
+    }
+    const ir = extractIR(spec as Record<string, unknown>)
+    const ids = ir.operations.map(op => op.operationId)
+    expect(ids).toContain('getByQuerySdkrw')
+    expect(ids).toContain('searchUsers')
+  })
+
   it('resolves anyOf nullable types to base type', () => {
     const spec = {
       paths: {

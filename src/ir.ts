@@ -103,7 +103,12 @@ function generateOperationId(method: string, path: string): string {
   const action = actionSuffixes[lastSegment]
 
   if (action && segments.length >= 2) {
-    const resource = kebabToPascal(segments[segments.length - 2])
+    let resourceIndex = segments.length - 2
+    // Skip version-like segments (v1, v2, etc.) to find the real resource name
+    if (/^v\d+$/i.test(segments[resourceIndex]) && resourceIndex > 0) {
+      resourceIndex--
+    }
+    const resource = kebabToPascal(segments[resourceIndex])
     return `${action}${resource}`
   }
 

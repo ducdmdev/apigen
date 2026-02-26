@@ -39,9 +39,9 @@ function defineConfig(config: ConfigInput): Config
 
 ## Config Options
 
-### `input` (required)
+### `input` (required for config, optional for CLI)
 
-Path to your OpenAPI 3.x or Swagger 2.0 spec file. Accepts YAML (`.yaml`, `.yml`) or JSON (`.json`).
+Path or URL to your OpenAPI 3.x or Swagger 2.0 spec. Accepts local YAML/JSON files or `http://`/`https://` URLs.
 
 ```ts
 defineConfig({
@@ -95,9 +95,9 @@ defineConfig({
 npx apigen generate [flags]
 ```
 
-### `--input` / `-i` (required)
+### `--input` / `-i`
 
-Path to the OpenAPI/Swagger spec file.
+Path or URL to the OpenAPI/Swagger spec file. When omitted, an interactive prompt guides you through providing the spec via local file path, direct URL, or auto-discovery from a base URL.
 
 ```bash
 npx apigen generate --input ./openapi.yaml
@@ -120,13 +120,22 @@ Skip mock data generation. This is the CLI equivalent of `mock: false` in the co
 npx apigen generate -i ./openapi.yaml --no-mock
 ```
 
+### `--split`
+
+Split generated output into per-tag feature folders. Each tag gets its own directory with `types.ts`, `hooks.ts`, `mocks.ts`, and `index.ts`. A shared `test-mode-provider.tsx` is placed at the output root.
+
+```bash
+npx apigen generate -i ./openapi.yaml --split
+```
+
 ### Full example
 
 ```bash
 npx apigen generate \
   --input ./specs/petstore.yaml \
   --output ./src/api \
-  --no-mock
+  --no-mock \
+  --split
 ```
 
 ## Peer Dependencies
@@ -135,7 +144,7 @@ Your consuming project must install:
 
 | Package | Version |
 |---------|---------|
-| `react` | `^18` |
+| `react` | `^18 \|\| ^19` |
 | `@tanstack/react-query` | `^5` |
 
 The generated hooks import from `@tanstack/react-query` directly. The generated test-mode provider imports from `react`.
@@ -146,7 +155,7 @@ npm install react @tanstack/react-query
 
 ## Generated Files Reference
 
-The output directory always contains five files:
+The output directory contains these files (mocks and provider are omitted when `--no-mock` is used):
 
 | File | Description |
 |------|-------------|
@@ -160,6 +169,7 @@ The output directory always contains five files:
 
 | Option | CLI Flag | Default |
 |--------|----------|---------|
-| `input` | `--input` / `-i` | *(required)* |
+| `input` | `--input` / `-i` | *(interactive prompt)* |
 | `output` | `--output` / `-o` | `./src/api/generated` |
 | `mock` | `--no-mock` to disable | `true` |
+| `split` | `--split` | `false` |

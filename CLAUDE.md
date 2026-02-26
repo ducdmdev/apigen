@@ -16,7 +16,7 @@ apigen is a standalone npm CLI that reads OpenAPI 3.0+ and Swagger 2.0 specs and
 ## Commands
 
 ```bash
-bun test          # run tests (31 tests across 10 files)
+bun test          # run tests (56 tests across 11 files)
 bun run typecheck # tsc --noEmit
 bun run build     # compile to dist/
 ```
@@ -32,6 +32,7 @@ src/
 ├── index.ts            # Public exports (config only)
 ├── loader.ts           # Reads YAML/JSON, converts Swagger 2→3, bundles refs
 ├── ir.ts               # Extracts IR (operations + schemas) from OpenAPI spec
+├── discover.ts         # Auto-discovers API specs at well-known paths
 ├── writer.ts           # Orchestrates all generators, writes to disk
 ├── generators/
 │   ├── types.ts        # IR → TypeScript interfaces

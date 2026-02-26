@@ -9,9 +9,9 @@ apigen is a standalone npm CLI that reads OpenAPI 3.0+ and Swagger 2.0 specs and
 - **Runtime**: Node.js >=18
 - **Language**: TypeScript 5.9, strict mode, ES2022 target, ESM only
 - **Package manager**: Bun
-- **Build**: `bun build ./src/cli.ts --outdir dist --target node`
+- **Build**: `bun build ./src/cli.ts --outdir dist --target node && bun build ./src/index.ts --outdir dist --target node --format esm && tsc --emitDeclarationOnly --outDir dist`
 - **Test framework**: Vitest
-- **Key deps**: commander, @redocly/openapi-core, swagger2openapi, yaml
+- **Key deps**: commander, @redocly/openapi-core, swagger2openapi, yaml, @faker-js/faker, @inquirer/prompts
 
 ## Commands
 
@@ -39,7 +39,8 @@ src/
 │   ├── hooks.ts        # IR → useQuery/useMutation hooks
 │   ├── mocks.ts        # IR → static mock data constants
 │   ├── provider.ts     # → React test mode context provider
-│   └── index-file.ts   # → barrel re-exports
+│   ├── index-file.ts   # → barrel re-exports
+│   └── api-fetch.ts    # → shared apiFetch helper (split mode)
 └── types/
     └── swagger2openapi.d.ts
 ```
@@ -76,6 +77,10 @@ The CLI produces 5 files in the output directory:
 - `mocks.ts` — static mock constants per schema and response
 - `test-mode-provider.tsx` — React context toggling mock vs real
 - `index.ts` — barrel re-exports
+
+With `--split` flag, output is organized into per-tag feature folders:
+- Root: `test-mode-provider.tsx`, `api-fetch.ts`, `index.ts` (re-exports all tags)
+- Per-tag: `{tag}/types.ts`, `{tag}/hooks.ts`, `{tag}/mocks.ts`, `{tag}/index.ts`
 
 All generated files include `/* eslint-disable */` and `/* auto-generated */` headers.
 

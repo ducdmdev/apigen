@@ -1,6 +1,6 @@
 {
   "name": "apigen-tanstack",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Generate TanStack Query v5 React hooks from OpenAPI/Swagger specs with built-in test mode",
   "keywords": [
     "openapi",

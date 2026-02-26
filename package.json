@@ -1,6 +1,6 @@
 {
   "name": "apigen-tanstack",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Generate TanStack Query v5 React hooks from OpenAPI/Swagger specs with built-in test mode",
   "keywords": [
     "openapi",
@@ -30,7 +30,9 @@
     "apigen-tanstack": "./dist/cli.js",
     "apigen": "./dist/cli.js"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "bun build ./src/cli.ts --outdir dist --target node && bun build ./src/index.ts --outdir dist --target node --format esm && tsc --emitDeclarationOnly --outDir dist",
     "test": "vitest run",

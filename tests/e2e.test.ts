@@ -150,6 +150,13 @@ describe('e2e: --split flag', () => {
       expect(rootIndex).toContain("export * from './posts'")
       expect(rootIndex).toContain("export * from './users'")
       expect(rootIndex).toContain("export * from './test-mode-provider'")
+
+      // Per-tag index should NOT re-export test-mode-provider (it lives at root only)
+      const usersIndex = readFileSync(join(outDir, 'users', 'index.ts'), 'utf8')
+      expect(usersIndex).not.toContain('test-mode-provider')
+      expect(usersIndex).toContain("export * from './types'")
+      expect(usersIndex).toContain("export * from './hooks'")
+      expect(usersIndex).toContain("export * from './mocks'")
     } finally {
       rmSync(outDir, { recursive: true })
     }

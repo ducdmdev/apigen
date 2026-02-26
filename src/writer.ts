@@ -86,7 +86,7 @@ function writeSplit(ir: IR, outputDir: string, mock: boolean): void {
     if (mock) {
       writeFileSync(join(featureDir, 'mocks.ts'), generateMocks(subsetIR), 'utf8')
     }
-    writeFileSync(join(featureDir, 'index.ts'), generateIndexFile({ mock }), 'utf8')
+    writeFileSync(join(featureDir, 'index.ts'), generateIndexFile({ mock, includeProvider: false }), 'utf8')
   }
 
   // Write root index that re-exports all feature folders

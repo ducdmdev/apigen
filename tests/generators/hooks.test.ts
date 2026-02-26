@@ -68,4 +68,22 @@ describe('generateHooks', () => {
     expect(output).not.toContain('testMode')
     expect(output).toContain('apiFetch')
   })
+
+  it('generates inline apiFetch with baseURL when provided', async () => {
+    const spec = await loadSpec(resolve(__dirname, '../fixtures/petstore-oas3.yaml'))
+    const ir = extractIR(spec)
+    const output = generateHooks(ir, { mock: false, baseURL: 'https://api.example.com' })
+
+    expect(output).toContain('https://api.example.com')
+    expect(output).toContain('`https://api.example.com${path}`')
+  })
+
+  it('generates inline apiFetch without baseURL when not provided', async () => {
+    const spec = await loadSpec(resolve(__dirname, '../fixtures/petstore-oas3.yaml'))
+    const ir = extractIR(spec)
+    const output = generateHooks(ir, { mock: false })
+
+    expect(output).toContain('fetch(path')
+    expect(output).not.toContain('https://api.example.com')
+  })
 })

@@ -181,7 +181,7 @@ function collectMockImports(ir: IR): string[] {
   return [...mocks]
 }
 
-function generateHooks(ir: IR, options?: { mock?: boolean; providerImportPath?: string; apiFetchImportPath?: string }): string {
+function generateHooks(ir: IR, options?: { mock?: boolean; providerImportPath?: string; apiFetchImportPath?: string; baseURL?: string }): string {
   const mock = options?.mock ?? true
   const providerImportPath = options?.providerImportPath ?? './test-mode-provider'
   const apiFetchImportPath = options?.apiFetchImportPath
@@ -213,8 +213,13 @@ function generateHooks(ir: IR, options?: { mock?: boolean; providerImportPath?: 
   parts.push('')
 
   if (!apiFetchImportPath) {
+    const baseURL = options?.baseURL
     parts.push(`function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {`)
-    parts.push(`  return fetch(path, {`)
+    if (baseURL) {
+      parts.push(`  return fetch(\`${baseURL}\${path}\`, {`)
+    } else {
+      parts.push(`  return fetch(path, {`)
+    }
     parts.push(`    headers: { 'Content-Type': 'application/json' },`)
     parts.push(`    ...init,`)
     parts.push(`  }).then(res => {`)

@@ -2,7 +2,7 @@
 
 import { Command } from 'commander'
 import { resolve, dirname, join } from 'path'
-import { existsSync, readFileSync } from 'fs'
+import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { fileURLToPath, pathToFileURL } from 'url'
 import { select, input, confirm } from '@inquirer/prompts'
 import { loadSpec } from './loader'
@@ -69,6 +69,57 @@ function findConfigFile(): string | null {
   return null
 }
 
+function writeConfigFile(config: ConfigInput): void {
+  const lines = [
+    `import { defineConfig } from 'apigen-tanstack'`,
+    ``,
+    `export default defineConfig(${JSON.stringify(config, null, 2)})`,
+    ``,
+  ]
+  writeFileSync('apigen.config.ts', lines.join('\n'), 'utf8')
+}
+
+async function promptForConfig(inputValue: string): Promise<ConfigInput> {
+  const output = await input({
+    message: 'Output directory:',
+    default: './src/api/generated',
+  })
+
+  const mock = await confirm({
+    message: 'Generate mock data?',
+    default: true,
+  })
+
+  const split = await confirm({
+    message: 'Split output by API tags?',
+    default: false,
+  })
+
+  const baseURL = await input({
+    message: 'Base URL for API calls (leave empty for relative paths):',
+  })
+
+  const configInput: ConfigInput = {
+    input: inputValue,
+    output: output.trim(),
+    mock,
+    split,
+    ...(baseURL.trim() ? { baseURL: baseURL.trim() } : {}),
+  }
+
+  const shouldSave = await confirm({
+    message: 'Save as apigen.config.ts?',
+    default: true,
+  })
+
+  if (shouldSave) {
+    writeConfigFile(configInput)
+    console.log('Saved apigen.config.ts')
+  }
+
+  return configInput
+}
+
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf-8'))
 
@@ -102,17 +153,26 @@ program
       }
     }
 
-    // Merge: CLI flags override config file
-    const config = resolveConfig({
-      input: options.input ?? fileConfig?.input ?? '',
-      output: options.output !== './src/api/generated' ? options.output : (fileConfig?.output ?? options.output),
-      mock: options.mock !== undefined ? options.mock : fileConfig?.mock,
-      split: options.split ?? fileConfig?.split,
-      baseURL: options.baseUrl ?? fileConfig?.baseURL,
-      apiFetchImportPath: fileConfig?.apiFetchImportPath,
-    })
+    let config: ReturnType<typeof resolveConfig>
+    let inputValue: string
 
-    const inputValue = config.input || (await promptForInput())
+    // If no config file and no -i flag, run interactive wizard
+    if (!fileConfig && !options.input) {
+      inputValue = await promptForInput()
+      const wizardConfig = await promptForConfig(inputValue)
+      config = resolveConfig(wizardConfig)
+    } else {
+      // Merge: CLI flags override config file
+      config = resolveConfig({
+        input: options.input ?? fileConfig?.input ?? '',
+        output: options.output !== './src/api/generated' ? options.output : (fileConfig?.output ?? options.output),
+        mock: options.mock !== undefined ? options.mock : fileConfig?.mock,
+        split: options.split ?? fileConfig?.split,
+        baseURL: options.baseUrl ?? fileConfig?.baseURL,
+        apiFetchImportPath: fileConfig?.apiFetchImportPath,
+      })
+      inputValue = config.input || (await promptForInput())
+    }
     const isUrlInput = inputValue.startsWith('http://') || inputValue.startsWith('https://')
     const inputPath = isUrlInput ? inputValue : resolve(inputValue)
     const outputPath = resolve(config.output)

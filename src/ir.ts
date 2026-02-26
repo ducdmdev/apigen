@@ -203,6 +203,40 @@ function extractInlineSchema(name: string, schema: Record<string, unknown>): IRS
   return { name, properties, required }
 }
 
+function resolveAllOf(
+  allOfArray: Record<string, unknown>[],
+  schemasDef: Record<string, Record<string, unknown>>,
+): { properties: Record<string, Record<string, unknown>>; required: string[] } {
+  const mergedProps: Record<string, Record<string, unknown>> = {}
+  const mergedRequired: string[] = []
+
+  for (const variant of allOfArray) {
+    let variantSchema = variant
+
+    // Resolve $ref to component schema
+    if (variant.$ref && typeof variant.$ref === 'string') {
+      const refName = (variant.$ref as string).split('/').pop()
+      if (refName && schemasDef[refName]) {
+        variantSchema = schemasDef[refName]
+        // If the referenced schema itself uses allOf, resolve it recursively
+        if (Array.isArray(variantSchema.allOf)) {
+          const resolved = resolveAllOf(variantSchema.allOf as Record<string, unknown>[], schemasDef)
+          Object.assign(mergedProps, resolved.properties)
+          mergedRequired.push(...resolved.required)
+          continue
+        }
+      }
+    }
+
+    const props = (variantSchema.properties ?? {}) as Record<string, Record<string, unknown>>
+    const req = (variantSchema.required ?? []) as string[]
+    Object.assign(mergedProps, props)
+    mergedRequired.push(...req)
+  }
+
+  return { properties: mergedProps, required: mergedRequired }
+}
+
 function extractIR(spec: Record<string, unknown>): IR {
   const paths = (spec.paths ?? {}) as Record<string, Record<string, unknown>>
   const components = (spec.components ?? {}) as Record<string, unknown>
@@ -291,8 +325,17 @@ function extractIR(spec: Record<string, unknown>): IR {
   }
 
   for (const [name, schemaDef] of Object.entries(schemasDef)) {
-    const props = (schemaDef.properties ?? {}) as Record<string, Record<string, unknown>>
-    const required = (schemaDef.required ?? []) as string[]
+    let props: Record<string, Record<string, unknown>>
+    let required: string[]
+
+    if (Array.isArray(schemaDef.allOf)) {
+      const resolved = resolveAllOf(schemaDef.allOf as Record<string, unknown>[], schemasDef)
+      props = resolved.properties
+      required = resolved.required
+    } else {
+      props = (schemaDef.properties ?? {}) as Record<string, Record<string, unknown>>
+      required = (schemaDef.required ?? []) as string[]
+    }
 
     const properties: IRProperty[] = Object.entries(props).map(([propName, propSchema]) => {
       const isArray = propSchema.type === 'array' || mapOpenApiType(propSchema) === 'array'

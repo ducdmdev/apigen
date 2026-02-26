@@ -270,6 +270,46 @@ describe('extractIR', () => {
     expect(ids).toContain('searchUsers')
   })
 
+  it('resolves allOf by merging properties from all variants', async () => {
+    const spec = await loadSpec(resolve(__dirname, 'fixtures/allof-composition.yaml'))
+    const ir = extractIR(spec)
+
+    const user = ir.schemas.find(s => s.name === 'User')
+    expect(user).toBeDefined()
+    // Should have merged properties from BaseEntity + inline
+    expect(user!.properties).toHaveLength(4)
+    expect(user!.properties.find(p => p.name === 'id')).toBeDefined()
+    expect(user!.properties.find(p => p.name === 'createdAt')).toBeDefined()
+    expect(user!.properties.find(p => p.name === 'name')).toBeDefined()
+    expect(user!.properties.find(p => p.name === 'email')).toBeDefined()
+    // Required should merge from both
+    expect(user!.required).toContain('id')
+    expect(user!.required).toContain('name')
+  })
+
+  it('resolves allOf with inline-only variants (no $ref)', () => {
+    const spec = {
+      paths: {},
+      components: {
+        schemas: {
+          Merged: {
+            allOf: [
+              { type: 'object', required: ['a'], properties: { a: { type: 'string' } } },
+              { type: 'object', properties: { b: { type: 'number' } } },
+            ],
+          },
+        },
+      },
+    }
+    const ir = extractIR(spec as Record<string, unknown>)
+    const merged = ir.schemas.find(s => s.name === 'Merged')
+    expect(merged).toBeDefined()
+    expect(merged!.properties).toHaveLength(2)
+    expect(merged!.properties.find(p => p.name === 'a')!.type).toBe('string')
+    expect(merged!.properties.find(p => p.name === 'b')!.type).toBe('number')
+    expect(merged!.required).toContain('a')
+  })
+
   it('detects circular references and breaks the cycle', () => {
     const spec = {
       paths: {},

@@ -39,12 +39,13 @@
     "prepublishOnly": "bun run typecheck && bun test && bun run build"
   },
   "devDependencies": {
-    "typescript": "^5.9.0",
-    "vitest": "^3.0.0",
+    "@faker-js/faker": "^10.3.0",
+    "@redocly/openapi-core": "^1.0.0",
     "@types/node": "^22.0.0",
     "commander": "^13.0.0",
-    "@redocly/openapi-core": "^1.0.0",
     "swagger2openapi": "^7.0.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.0.0",
     "yaml": "^2.0.0"
   },
   "peerDependencies": {
@@ -52,10 +53,17 @@
     "@tanstack/react-query": "^5"
   },
   "peerDependenciesMeta": {
-    "react": { "optional": true },
-    "@tanstack/react-query": { "optional": true }
+    "react": {
+      "optional": true
+    },
+    "@tanstack/react-query": {
+      "optional": true
+    }
   },
   "engines": {
     "node": ">=18"
+  },
+  "dependencies": {
+    "@inquirer/prompts": "^8.3.0"
   }
 }

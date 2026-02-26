@@ -118,7 +118,7 @@ interface IROperation {
 }
 ```
 
-**operationId fallback:** If the spec does not define an `operationId`, one is synthesized as `${method}${path}` with non-alphanumeric characters replaced by underscores. Example: `GET /users/{id}` becomes `get_users__id_`.
+**operationId fallback:** If the spec does not define an `operationId`, one is synthesized by `generateOperationId(method, path)`. It uses smart heuristics: known action suffixes (`search`, `get-by-id`, `create`, `update`, `delete`, etc.) are recognized, and path segments are converted to PascalCase. Examples: `GET /users` becomes `listUsers`, `POST /users/{id}/search` becomes `searchUsers`, `DELETE /users/{id}` becomes `deleteUsers`.
 
 **Response resolution order:** The extractor looks for a success response in this order: `200`, then `201`, then `default`. It only extracts the `application/json` content type.
 
@@ -218,10 +218,11 @@ function generateSomething(ir: IR): string {
 | Generator | File | Signature | Description |
 |---|---|---|---|
 | `generateTypes` | `generators/types.ts` | `(ir: IR) => string` | Schema interfaces + param interfaces |
-| `generateHooks` | `generators/hooks.ts` | `(ir: IR) => string` | useQuery/useMutation hooks, apiFetch helper, imports |
+| `generateHooks` | `generators/hooks.ts` | `(ir: IR, options?) => string` | useQuery/useMutation hooks, apiFetch helper, imports |
 | `generateMocks` | `generators/mocks.ts` | `(ir: IR) => string` | Schema mocks + response mocks |
 | `generateProvider` | `generators/provider.ts` | `() => string` | Static ApiTestModeProvider context (no IR needed) |
-| `generateIndexFile` | `generators/index-file.ts` | `() => string` | Static barrel re-exports (no IR needed) |
+| `generateIndexFile` | `generators/index-file.ts` | `(options?) => string` | Barrel re-exports (conditional on mock) |
+| `generateRootIndexFile` | `generators/index-file.ts` | `(tagSlugs, options?) => string` | Root index re-exporting per-tag feature folders |
 
 ### types generator (`generators/types.ts`)
 
@@ -262,7 +263,9 @@ Returns a static string literal with `export * from` statements for each of the 
 
 ## Stage 4: File Writer (`src/writer.ts`)
 
-**Entry point:** `writeGeneratedFiles(ir: IR, outputDir: string): void`
+**Entry point:** `writeGeneratedFiles(ir: IR, outputDir: string, options?: { mock?: boolean; split?: boolean }): void`
+
+When `mock` is `false`, mocks and provider files are skipped. When `split` is `true`, output is organized into per-tag feature folders.
 
 The writer is the orchestrator. It:
 
@@ -271,14 +274,15 @@ The writer is the orchestrator. It:
 3. Writes each result to the corresponding file using `writeFileSync`.
 
 ```ts
-function writeGeneratedFiles(ir: IR, outputDir: string): void {
-  mkdirSync(outputDir, { recursive: true })
+function writeGeneratedFiles(ir: IR, outputDir: string, options?: { mock?: boolean; split?: boolean }): void {
+  const mock = options?.mock ?? true
+  const split = options?.split ?? false
 
-  writeFileSync(join(outputDir, 'types.ts'),               generateTypes(ir),     'utf8')
-  writeFileSync(join(outputDir, 'hooks.ts'),               generateHooks(ir),     'utf8')
-  writeFileSync(join(outputDir, 'mocks.ts'),               generateMocks(ir),     'utf8')
-  writeFileSync(join(outputDir, 'test-mode-provider.tsx'),  generateProvider(),    'utf8')
-  writeFileSync(join(outputDir, 'index.ts'),               generateIndexFile(),   'utf8')
+  if (split) {
+    writeSplit(ir, outputDir, mock)   // per-tag feature folders
+  } else {
+    writeFlat(ir, outputDir, mock)    // single directory
+  }
 }
 ```
 
@@ -342,19 +346,41 @@ apigen generate -i <spec-path> [-o <output-dir>]
 
 | Flag | Default | Description |
 |---|---|---|
-| `-i, --input <path>` | (required) | Path to OpenAPI or Swagger spec file |
+| `-i, --input <path>` | *(interactive prompt)* | Path or URL to OpenAPI or Swagger spec file |
 | `-o, --output <path>` | `./src/api/generated` | Output directory for generated files |
 | `--no-mock` | mocks enabled | Skip mock data generation |
+| `--split` | disabled | Split output into per-tag feature folders |
 
 Internally, it runs the pipeline in sequence:
 
 ```ts
-const spec = await loadSpec(inputPath)    // Stage 1: load + normalize
-const ir = extractIR(spec)                // Stage 2: extract IR
-writeGeneratedFiles(ir, outputPath)       // Stage 3+4: generate + write
+const inputValue = options.input ?? (await promptForInput())  // Interactive if -i omitted
+const spec = await loadSpec(inputPath)                        // Stage 1: load + normalize
+const ir = extractIR(spec)                                    // Stage 2: extract IR
+writeGeneratedFiles(ir, outputPath, { mock, split })          // Stage 3+4: generate + write
 ```
 
+When `-i` is omitted, `promptForInput()` (from `@inquirer/prompts`) offers three choices: local file path, direct URL, or auto-discover from a base URL using `discoverSpec()` from `src/discover.ts`.
+
 The CLI logs the number of operations and schemas found, and the output directory path.
+
+---
+
+### Auto-Discovery (`src/discover.ts`)
+
+**Entry point:** `discoverSpec(baseUrl: string): Promise<{ url: string; version: SpecVersion }>`
+
+When the user selects "Auto-discover from base URL" in the interactive prompt, this module tries well-known API documentation paths in order:
+
+| Path | Framework |
+|---|---|
+| `/v3/api-docs` | Spring Boot (SpringDoc) |
+| `/swagger.json` | Swagger UI / Express swagger-jsdoc |
+| `/openapi.json` | Common convention |
+| `/api-docs` | Older Spring Boot (Springfox) |
+| `/docs/openapi.json` | FastAPI |
+
+Each path is fetched with a 3-second timeout. The response is parsed as JSON (with YAML fallback) and validated with `detectSpecVersion()`. The first valid response wins. If all fail, an error lists every path tried.
 
 ---
 
@@ -364,7 +390,7 @@ For programmatic use, apigen exports `defineConfig` and `resolveConfig`:
 
 ```ts
 interface ConfigInput {
-  input: string          // required: path to spec file
+  input: string          // required: path or URL to spec
   output?: string        // default: './src/api/generated'
   mock?: boolean         // default: true
 }

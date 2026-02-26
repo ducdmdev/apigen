@@ -1,6 +1,7 @@
 import { describe, it, expect, afterAll } from 'vitest'
-import { resolve } from 'path'
-import { readFileSync } from 'fs'
+import { resolve, join } from 'path'
+import { readFileSync, writeFileSync, rmSync } from 'fs'
+import { tmpdir } from 'os'
 import { createServer, type Server } from 'http'
 import { loadSpec, detectSpecVersion, isUrl } from '../src/loader'
 
@@ -46,6 +47,22 @@ describe('loadSpec', () => {
     const spec = await loadSpec(resolve(__dirname, 'fixtures/petstore-swagger2.yaml'))
     expect(spec.openapi).toMatch(/^3\./)
     expect(spec.paths['/pets']).toBeDefined()
+  })
+})
+
+describe('loadSpec error messages', () => {
+  it('throws user-friendly error for file not found', async () => {
+    await expect(loadSpec('./nonexistent-spec.yaml')).rejects.toThrow('Cannot find spec file')
+  })
+
+  it('throws user-friendly error for unparseable file', async () => {
+    const tmpFile = join(tmpdir(), 'bad-spec-' + Date.now() + '.yaml')
+    writeFileSync(tmpFile, '{{invalid yaml content', 'utf8')
+    try {
+      await expect(loadSpec(tmpFile)).rejects.toThrow('Failed to parse')
+    } finally {
+      rmSync(tmpFile)
+    }
   })
 })
 

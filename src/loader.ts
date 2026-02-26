@@ -1,4 +1,4 @@
-import { readFileSync } from 'fs'
+import { existsSync, readFileSync } from 'fs'
 import { parse as parseYaml } from 'yaml'
 import { bundle, createConfig } from '@redocly/openapi-core'
 import converter from 'swagger2openapi'
@@ -53,12 +53,23 @@ async function loadSpec(input: string): Promise<Record<string, unknown>> {
     return loadSpecFromUrl(input)
   }
 
+  if (!existsSync(input)) {
+    throw new Error(`Cannot find spec file: ${input}. Check the path and try again.`)
+  }
+
   const raw = readFileSync(input, 'utf8')
-  const parsed = input.endsWith('.json') ? JSON.parse(raw) : parseYaml(raw)
+
+  let parsed: Record<string, unknown>
+  try {
+    parsed = input.endsWith('.json') ? JSON.parse(raw) : parseYaml(raw)
+  } catch (err) {
+    throw new Error(`Failed to parse ${input}: ${(err as Error).message}`)
+  }
+
   const version = detectSpecVersion(parsed)
 
   if (version === 'unknown') {
-    throw new Error(`Unrecognized spec format in ${input}`)
+    throw new Error(`Unrecognized spec format in ${input}. Expected OpenAPI 3.x or Swagger 2.0.`)
   }
 
   if (version === 'swagger2') {

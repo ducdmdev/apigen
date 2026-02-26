@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander'
-import { resolve } from 'path'
+import { resolve, dirname, join } from 'path'
+import { readFileSync } from 'fs'
+import { fileURLToPath } from 'url'
 import { select, input } from '@inquirer/prompts'
 import { loadSpec } from './loader'
 import { extractIR } from './ir'
@@ -48,12 +50,15 @@ async function promptForInput(): Promise<string> {
   return result.url
 }
 
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf-8'))
+
 const program = new Command()
 
 program
   .name('apigen-tanstack')
   .description('Generate TanStack Query hooks from OpenAPI/Swagger specs')
-  .version('0.1.0')
+  .version(pkg.version)
 
 program
   .command('generate')

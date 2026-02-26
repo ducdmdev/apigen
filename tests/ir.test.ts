@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { resolve } from 'path'
 import { loadSpec } from '../src/loader'
 import { extractIR } from '../src/ir'
@@ -270,6 +270,84 @@ describe('extractIR', () => {
     expect(ids).toContain('searchUsers')
   })
 
+  it('resolves allOf by merging properties from all variants', async () => {
+    const spec = await loadSpec(resolve(__dirname, 'fixtures/allof-composition.yaml'))
+    const ir = extractIR(spec)
+
+    const user = ir.schemas.find(s => s.name === 'User')
+    expect(user).toBeDefined()
+    // Should have merged properties from BaseEntity + inline
+    expect(user!.properties).toHaveLength(4)
+    expect(user!.properties.find(p => p.name === 'id')).toBeDefined()
+    expect(user!.properties.find(p => p.name === 'createdAt')).toBeDefined()
+    expect(user!.properties.find(p => p.name === 'name')).toBeDefined()
+    expect(user!.properties.find(p => p.name === 'email')).toBeDefined()
+    // Required should merge from both
+    expect(user!.required).toContain('id')
+    expect(user!.required).toContain('name')
+  })
+
+  it('resolves allOf with inline-only variants (no $ref)', () => {
+    const spec = {
+      paths: {},
+      components: {
+        schemas: {
+          Merged: {
+            allOf: [
+              { type: 'object', required: ['a'], properties: { a: { type: 'string' } } },
+              { type: 'object', properties: { b: { type: 'number' } } },
+            ],
+          },
+        },
+      },
+    }
+    const ir = extractIR(spec as Record<string, unknown>)
+    const merged = ir.schemas.find(s => s.name === 'Merged')
+    expect(merged).toBeDefined()
+    expect(merged!.properties).toHaveLength(2)
+    expect(merged!.properties.find(p => p.name === 'a')!.type).toBe('string')
+    expect(merged!.properties.find(p => p.name === 'b')!.type).toBe('number')
+    expect(merged!.required).toContain('a')
+  })
+
+  it('detects circular references and breaks the cycle', () => {
+    const spec = {
+      paths: {},
+      components: {
+        schemas: {
+          User: {
+            type: 'object',
+            required: ['id'],
+            properties: {
+              id: { type: 'string' },
+              manager: { $ref: '#/components/schemas/User' },
+            },
+          },
+          Node: {
+            type: 'object',
+            properties: {
+              value: { type: 'string' },
+              children: { type: 'array', items: { $ref: '#/components/schemas/Node' } },
+            },
+          },
+        },
+      },
+    }
+    const ir = extractIR(spec as Record<string, unknown>)
+
+    // Should complete without infinite loop
+    expect(ir.schemas).toHaveLength(2)
+
+    const user = ir.schemas.find(s => s.name === 'User')
+    expect(user).toBeDefined()
+    expect(user!.properties.find(p => p.name === 'manager')!.ref).toBe('#/components/schemas/User')
+
+    const node = ir.schemas.find(s => s.name === 'Node')
+    expect(node).toBeDefined()
+    const children = node!.properties.find(p => p.name === 'children')!
+    expect(children.isArray).toBe(true)
+  })
+
   it('resolves anyOf nullable types to base type', () => {
     const spec = {
       paths: {
@@ -303,5 +381,14 @@ describe('extractIR', () => {
     expect(bodySchema!.properties.find(p => p.name === 'name')!.type).toBe('string')
     expect(bodySchema!.properties.find(p => p.name === 'code')!.type).toBe('string')
     expect(bodySchema!.properties.find(p => p.name === 'count')!.type).toBe('number')
+  })
+
+  it('warns when spec has no paths', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const spec = { components: { schemas: {} } }
+    const ir = extractIR(spec as Record<string, unknown>)
+    expect(ir.operations).toHaveLength(0)
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("no 'paths'"))
+    warnSpy.mockRestore()
   })
 })

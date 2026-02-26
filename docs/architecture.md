@@ -218,6 +218,7 @@ function generateSomething(ir: IR): string {
 | Generator | File | Signature | Description |
 |---|---|---|---|
 | `generateTypes` | `generators/types.ts` | `(ir: IR) => string` | Schema interfaces + param interfaces |
+| `generateApiFetch` | `generators/api-fetch.ts` | `(options?) => string` | Shared apiFetch helper (used in split mode) |
 | `generateHooks` | `generators/hooks.ts` | `(ir: IR, options?) => string` | useQuery/useMutation hooks, apiFetch helper, imports |
 | `generateMocks` | `generators/mocks.ts` | `(ir: IR) => string` | Schema mocks + response mocks |
 | `generateProvider` | `generators/provider.ts` | `() => string` | Static ApiTestModeProvider context (no IR needed) |
@@ -263,9 +264,9 @@ Returns a static string literal with `export * from` statements for each of the 
 
 ## Stage 4: File Writer (`src/writer.ts`)
 
-**Entry point:** `writeGeneratedFiles(ir: IR, outputDir: string, options?: { mock?: boolean; split?: boolean }): void`
+**Entry point:** `writeGeneratedFiles(ir: IR, outputDir: string, options?: { mock?: boolean; split?: boolean; baseURL?: string; apiFetchImportPath?: string; dryRun?: boolean }): FileInfo[] | void`
 
-When `mock` is `false`, mocks and provider files are skipped. When `split` is `true`, output is organized into per-tag feature folders.
+When `mock` is `false`, mocks and provider files are skipped. When `split` is `true`, output is organized into per-tag feature folders. When `dryRun` is `true`, returns an array of `FileInfo` objects (path + size) without writing. The `baseURL` and `apiFetchImportPath` options are passed through to the hooks and api-fetch generators.
 
 The writer is the orchestrator. It:
 
@@ -341,7 +342,7 @@ The key constraint is that generators must be **pure functions**: `IR` in, `stri
 The CLI ties everything together:
 
 ```
-apigen generate -i <spec-path> [-o <output-dir>]
+apigen generate -i <spec-path> [-o <output-dir>] [--config <path>] [--base-url <url>] [--dry-run] [--split] [--no-mock]
 ```
 
 | Flag | Default | Description |
@@ -350,17 +351,37 @@ apigen generate -i <spec-path> [-o <output-dir>]
 | `-o, --output <path>` | `./src/api/generated` | Output directory for generated files |
 | `--no-mock` | mocks enabled | Skip mock data generation |
 | `--split` | disabled | Split output into per-tag feature folders |
+| `-c, --config <path>` | *(auto-searches)* | Path to config file |
+| `--base-url <url>` | *(none)* | Base URL prefix for fetch paths |
+| `--dry-run` | disabled | Preview files without writing |
 
-Internally, it runs the pipeline in sequence:
+### Config file loading
+
+The CLI loads configuration in this priority order:
+
+1. **Explicit `--config` flag** — loads the specified file
+2. **Auto-search** — looks for `apigen.config.ts` or `apigen.config.js` in the current directory
+3. **CLI flags** — override any config file values
+4. **Interactive wizard** — runs when no config file and no `-i` flag are provided
+
+Config files are loaded via dynamic `import()` and must export a `ConfigInput` object (or use `defineConfig` for type safety).
+
+### Pipeline
+
+Internally, the CLI runs the pipeline in sequence:
 
 ```ts
-const inputValue = options.input ?? (await promptForInput())  // Interactive if -i omitted
+const fileConfig = await loadConfigFile(configPath)           // Load config file (if found)
+const config = resolveConfig({ ...fileConfig, ...cliFlags })  // Merge with CLI overrides
+const inputValue = config.input || (await promptForInput())   // Interactive if no input
 const spec = await loadSpec(inputPath)                        // Stage 1: load + normalize
 const ir = extractIR(spec)                                    // Stage 2: extract IR
-writeGeneratedFiles(ir, outputPath, { mock, split })          // Stage 3+4: generate + write
+writeGeneratedFiles(ir, outputPath, { mock, split, baseURL, apiFetchImportPath, dryRun })  // Stage 3+4
 ```
 
-When `-i` is omitted, `promptForInput()` (from `@inquirer/prompts`) offers three choices: local file path, direct URL, or auto-discover from a base URL using `discoverSpec()` from `src/discover.ts`.
+When no config file is found and `-i` is omitted, the full interactive wizard runs: `promptForInput()` for spec source, then `promptForConfig()` for output/mock/split/baseURL options, with an option to save as `apigen.config.ts`.
+
+The `--dry-run` flag invokes `collectFileInfo()` to calculate output file sizes without writing, then displays a preview. In TTY mode, the user is prompted to confirm before writing.
 
 The CLI logs the number of operations and schemas found, and the output directory path.
 
@@ -390,15 +411,21 @@ For programmatic use, apigen exports `defineConfig` and `resolveConfig`:
 
 ```ts
 interface ConfigInput {
-  input: string          // required: path or URL to spec
-  output?: string        // default: './src/api/generated'
-  mock?: boolean         // default: true
+  input: string                  // required: path or URL to spec
+  output?: string                // default: './src/api/generated'
+  mock?: boolean                 // default: true
+  split?: boolean                // default: false
+  baseURL?: string               // prefix for all fetch paths
+  apiFetchImportPath?: string    // custom import path for apiFetch
 }
 
 interface Config {
   input: string
   output: string
   mock: boolean
+  split: boolean
+  baseURL?: string
+  apiFetchImportPath?: string
 }
 ```
 

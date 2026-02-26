@@ -27,13 +27,37 @@ npx apigen generate --input ./openapi.yaml --output ./src/api/generated
 # From a URL
 npx apigen generate -i https://api.example.com/openapi.json
 
-# Interactive mode (omit -i to be prompted)
+# From a config file (auto-searches for apigen.config.ts if --config is omitted)
+npx apigen generate --config apigen.config.ts
+
+# Interactive mode (omit flags to be guided through setup)
 npx apigen generate
+
+# Preview without writing
+npx apigen generate -i ./openapi.yaml --dry-run
 ```
 
 That reads your OpenAPI 3.x or Swagger 2.0 spec (YAML or JSON, local file or URL), and writes generated files to `./src/api/generated`.
 
-When `-i` is omitted, an interactive prompt guides you through three options: local file path, direct URL, or auto-discover from a base URL.
+When `-i` is omitted and no config file is found, an interactive wizard guides you through: local file path, direct URL, or auto-discover from a base URL — then prompts for output directory, mock/split options, and optionally saves your choices as `apigen.config.ts`.
+
+### Config file
+
+Create an `apigen.config.ts` in your project root for repeatable generation:
+
+```ts
+import { defineConfig } from 'apigen-tanstack'
+
+export default defineConfig({
+  input: './specs/petstore.yaml',
+  output: './src/api/generated',
+  mock: true,
+  split: false,
+  baseURL: 'https://api.example.com',
+})
+```
+
+The CLI auto-discovers this file. Use `--config <path>` to point to a different location. CLI flags override config file values.
 
 ## Generated Output Structure
 
@@ -132,8 +156,9 @@ When `enabled` is `true`, every generated hook returns mock data from `mocks.ts`
 
 - **OpenAPI 3.x** (YAML or JSON)
 - **Swagger 2.0** (automatically converted to OpenAPI 3 via `swagger2openapi`)
+- **allOf composition** — schemas using `allOf` are merged into flat interfaces
 
-Specs with `$ref` references are bundled and resolved automatically via `@redocly/openapi-core`.
+Specs with `$ref` references (including circular references) are bundled and resolved automatically via `@redocly/openapi-core`.
 
 ## Next Steps
 

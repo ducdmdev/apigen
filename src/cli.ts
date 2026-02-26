@@ -2,13 +2,16 @@
 
 import { Command } from 'commander'
 import { resolve, dirname, join } from 'path'
-import { readFileSync } from 'fs'
-import { fileURLToPath } from 'url'
-import { select, input } from '@inquirer/prompts'
+import { existsSync, readFileSync, writeFileSync } from 'fs'
+import { fileURLToPath, pathToFileURL } from 'url'
+import { select, input, confirm } from '@inquirer/prompts'
 import { loadSpec } from './loader'
 import { extractIR } from './ir'
 import { writeGeneratedFiles } from './writer'
+import type { FileInfo } from './writer'
 import { discoverSpec } from './discover'
+import { resolveConfig } from './config'
+import type { ConfigInput } from './config'
 
 async function promptForInput(): Promise<string> {
   const source = await select({
@@ -50,6 +53,73 @@ async function promptForInput(): Promise<string> {
   return result.url
 }
 
+async function loadConfigFile(configPath: string): Promise<ConfigInput> {
+  const resolved = resolve(configPath)
+  if (!existsSync(resolved)) {
+    throw new Error(`Config file not found: ${configPath}`)
+  }
+  const module = await import(pathToFileURL(resolved).toString())
+  return module.default ?? module
+}
+
+function findConfigFile(): string | null {
+  for (const name of ['apigen.config.ts', 'apigen.config.js']) {
+    if (existsSync(resolve(name))) return resolve(name)
+  }
+  return null
+}
+
+function writeConfigFile(config: ConfigInput): void {
+  const lines = [
+    `import { defineConfig } from 'apigen-tanstack'`,
+    ``,
+    `export default defineConfig(${JSON.stringify(config, null, 2)})`,
+    ``,
+  ]
+  writeFileSync('apigen.config.ts', lines.join('\n'), 'utf8')
+}
+
+async function promptForConfig(inputValue: string): Promise<ConfigInput> {
+  const output = await input({
+    message: 'Output directory:',
+    default: './src/api/generated',
+  })
+
+  const mock = await confirm({
+    message: 'Generate mock data?',
+    default: true,
+  })
+
+  const split = await confirm({
+    message: 'Split output by API tags?',
+    default: false,
+  })
+
+  const baseURL = await input({
+    message: 'Base URL for API calls (leave empty for relative paths):',
+  })
+
+  const configInput: ConfigInput = {
+    input: inputValue,
+    output: output.trim(),
+    mock,
+    split,
+    ...(baseURL.trim() ? { baseURL: baseURL.trim() } : {}),
+  }
+
+  const shouldSave = await confirm({
+    message: 'Save as apigen.config.ts?',
+    default: true,
+  })
+
+  if (shouldSave) {
+    writeConfigFile(configInput)
+    console.log('Saved apigen.config.ts')
+  }
+
+  return configInput
+}
+
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf-8'))
 
@@ -67,11 +137,45 @@ program
   .option('-o, --output <path>', 'Output directory', './src/api/generated')
   .option('--no-mock', 'Skip mock data generation')
   .option('--split', 'Split output into per-tag feature folders')
-  .action(async (options: { input?: string; output: string; mock: boolean; split?: boolean }) => {
-    const inputValue = options.input ?? (await promptForInput())
+  .option('-c, --config <path>', 'Path to config file (searches for apigen.config.ts by default)')
+  .option('--base-url <url>', 'Base URL prefix for all API fetch paths')
+  .option('--dry-run', 'Preview files that would be generated without writing')
+  .action(async (options: { input?: string; output: string; mock: boolean; split?: boolean; config?: string; baseUrl?: string; dryRun?: boolean }) => {
+    // Load config file (explicit or auto-search)
+    let fileConfig: ConfigInput | null = null
+    if (options.config) {
+      fileConfig = await loadConfigFile(options.config)
+    } else {
+      const found = findConfigFile()
+      if (found) {
+        console.log(`Using config file: ${found}`)
+        fileConfig = await loadConfigFile(found)
+      }
+    }
+
+    let config: ReturnType<typeof resolveConfig>
+    let inputValue: string
+
+    // If no config file and no -i flag, run interactive wizard
+    if (!fileConfig && !options.input) {
+      inputValue = await promptForInput()
+      const wizardConfig = await promptForConfig(inputValue)
+      config = resolveConfig(wizardConfig)
+    } else {
+      // Merge: CLI flags override config file
+      config = resolveConfig({
+        input: options.input ?? fileConfig?.input ?? '',
+        output: options.output !== './src/api/generated' ? options.output : (fileConfig?.output ?? options.output),
+        mock: options.mock !== undefined ? options.mock : fileConfig?.mock,
+        split: options.split ?? fileConfig?.split,
+        baseURL: options.baseUrl ?? fileConfig?.baseURL,
+        apiFetchImportPath: fileConfig?.apiFetchImportPath,
+      })
+      inputValue = config.input || (await promptForInput())
+    }
     const isUrlInput = inputValue.startsWith('http://') || inputValue.startsWith('https://')
     const inputPath = isUrlInput ? inputValue : resolve(inputValue)
-    const outputPath = resolve(options.output)
+    const outputPath = resolve(config.output)
 
     console.log(`Reading spec from ${inputPath}`)
 
@@ -80,7 +184,51 @@ program
 
     console.log(`Found ${ir.operations.length} operations, ${ir.schemas.length} schemas`)
 
-    writeGeneratedFiles(ir, outputPath, { mock: options.mock, split: options.split })
+    if (options.dryRun) {
+      const files = writeGeneratedFiles(ir, outputPath, {
+        mock: config.mock,
+        split: config.split,
+        baseURL: config.baseURL,
+        apiFetchImportPath: config.apiFetchImportPath,
+        dryRun: true,
+      }) as FileInfo[]
+      const totalSize = files.reduce((sum, f) => sum + f.size, 0)
+
+      console.log('\nDry run — files that would be generated:\n')
+      for (const f of files) {
+        const sizeStr = f.size > 1024 ? `${(f.size / 1024).toFixed(1)} KB` : `${f.size} B`
+        console.log(`  ${f.path}  (${sizeStr})`)
+      }
+      const totalStr = totalSize > 1024 ? `${(totalSize / 1024).toFixed(1)} KB` : `${totalSize} B`
+      console.log(`\n  Total: ${files.length} files, ${totalStr}\n`)
+
+      // In non-TTY (CI), just print and exit
+      if (!process.stdin.isTTY) return
+
+      // In TTY, ask to proceed
+      const proceed = await confirm({ message: 'Proceed with generation?' })
+      if (!proceed) {
+        console.log('Cancelled.')
+        return
+      }
+
+      // User said yes — do the actual write
+      writeGeneratedFiles(ir, outputPath, {
+        mock: config.mock,
+        split: config.split,
+        baseURL: config.baseURL,
+        apiFetchImportPath: config.apiFetchImportPath,
+      })
+      console.log(`Generated files written to ${outputPath}`)
+      return
+    }
+
+    writeGeneratedFiles(ir, outputPath, {
+      mock: config.mock,
+      split: config.split,
+      baseURL: config.baseURL,
+      apiFetchImportPath: config.apiFetchImportPath,
+    })
 
     console.log(`Generated files written to ${outputPath}`)
   })

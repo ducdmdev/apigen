@@ -24,4 +24,16 @@ describe('generateApiFetch', () => {
     expect(output).toContain('/* eslint-disable */')
     expect(output).toContain('auto-generated')
   })
+
+  it('generates apiFetch with baseURL when provided', () => {
+    const output = generateApiFetch({ baseURL: 'https://api.example.com' })
+    expect(output).toContain('https://api.example.com')
+    expect(output).toContain('`https://api.example.com${path}`')
+  })
+
+  it('generates apiFetch without baseURL when not provided', () => {
+    const output = generateApiFetch()
+    expect(output).not.toContain('https://')
+    expect(output).toContain('fetch(path')
+  })
 })

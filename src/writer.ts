@@ -48,11 +48,11 @@ function buildSubsetIR(ops: IROperation[], allSchemas: IRSchema[]): IR {
   return { operations: ops, schemas }
 }
 
-function writeFlat(ir: IR, outputDir: string, mock: boolean): void {
+function writeFlat(ir: IR, outputDir: string, mock: boolean, opts?: { baseURL?: string; apiFetchImportPath?: string }): void {
   mkdirSync(outputDir, { recursive: true })
 
   writeFileSync(join(outputDir, 'types.ts'), generateTypes(ir), 'utf8')
-  writeFileSync(join(outputDir, 'hooks.ts'), generateHooks(ir, { mock }), 'utf8')
+  writeFileSync(join(outputDir, 'hooks.ts'), generateHooks(ir, { mock, baseURL: opts?.baseURL, apiFetchImportPath: opts?.apiFetchImportPath }), 'utf8')
   if (mock) {
     writeFileSync(join(outputDir, 'mocks.ts'), generateMocks(ir), 'utf8')
     writeFileSync(join(outputDir, 'test-mode-provider.tsx'), generateProvider(), 'utf8')
@@ -60,7 +60,7 @@ function writeFlat(ir: IR, outputDir: string, mock: boolean): void {
   writeFileSync(join(outputDir, 'index.ts'), generateIndexFile({ mock }), 'utf8')
 }
 
-function writeSplit(ir: IR, outputDir: string, mock: boolean): void {
+function writeSplit(ir: IR, outputDir: string, mock: boolean, opts?: { baseURL?: string }): void {
   mkdirSync(outputDir, { recursive: true })
 
   const groups = groupOperationsByTag(ir.operations)
@@ -72,7 +72,7 @@ function writeSplit(ir: IR, outputDir: string, mock: boolean): void {
   }
 
   // Write shared api-fetch at root
-  writeFileSync(join(outputDir, 'api-fetch.ts'), generateApiFetch(), 'utf8')
+  writeFileSync(join(outputDir, 'api-fetch.ts'), generateApiFetch({ baseURL: opts?.baseURL }), 'utf8')
 
   // Write per-tag feature folders
   for (const slug of tagSlugs) {
@@ -101,15 +101,73 @@ function writeSplit(ir: IR, outputDir: string, mock: boolean): void {
   )
 }
 
-function writeGeneratedFiles(ir: IR, outputDir: string, options?: { mock?: boolean; split?: boolean }): void {
+interface FileInfo {
+  path: string
+  size: number
+}
+
+function collectFileInfo(
+  ir: IR,
+  outputDir: string,
+  opts: { mock: boolean; split: boolean; baseURL?: string; apiFetchImportPath?: string },
+): FileInfo[] {
+  const files: FileInfo[] = []
+
+  if (opts.split) {
+    const groups = groupOperationsByTag(ir.operations)
+    const tagSlugs = [...groups.keys()].sort()
+
+    if (opts.mock) {
+      const content = generateProvider()
+      files.push({ path: join(outputDir, 'test-mode-provider.tsx'), size: Buffer.byteLength(content) })
+    }
+    const apiFetchContent = generateApiFetch({ baseURL: opts.baseURL })
+    files.push({ path: join(outputDir, 'api-fetch.ts'), size: Buffer.byteLength(apiFetchContent) })
+
+    for (const slug of tagSlugs) {
+      const ops = groups.get(slug)!
+      const subsetIR = buildSubsetIR(ops, ir.schemas)
+      const featureDir = join(outputDir, slug)
+
+      files.push({ path: join(featureDir, 'types.ts'), size: Buffer.byteLength(generateTypes(subsetIR)) })
+      files.push({ path: join(featureDir, 'hooks.ts'), size: Buffer.byteLength(generateHooks(subsetIR, { mock: opts.mock, providerImportPath: '../test-mode-provider', apiFetchImportPath: '../api-fetch' })) })
+      if (opts.mock) {
+        files.push({ path: join(featureDir, 'mocks.ts'), size: Buffer.byteLength(generateMocks(subsetIR)) })
+      }
+      files.push({ path: join(featureDir, 'index.ts'), size: Buffer.byteLength(generateIndexFile({ mock: opts.mock, includeProvider: false })) })
+    }
+
+    files.push({ path: join(outputDir, 'index.ts'), size: Buffer.byteLength(generateRootIndexFile(tagSlugs, { mock: opts.mock })) })
+  } else {
+    files.push({ path: join(outputDir, 'types.ts'), size: Buffer.byteLength(generateTypes(ir)) })
+    files.push({ path: join(outputDir, 'hooks.ts'), size: Buffer.byteLength(generateHooks(ir, { mock: opts.mock, baseURL: opts.baseURL, apiFetchImportPath: opts.apiFetchImportPath })) })
+    if (opts.mock) {
+      files.push({ path: join(outputDir, 'mocks.ts'), size: Buffer.byteLength(generateMocks(ir)) })
+      files.push({ path: join(outputDir, 'test-mode-provider.tsx'), size: Buffer.byteLength(generateProvider()) })
+    }
+    files.push({ path: join(outputDir, 'index.ts'), size: Buffer.byteLength(generateIndexFile({ mock: opts.mock })) })
+  }
+
+  return files
+}
+
+function writeGeneratedFiles(ir: IR, outputDir: string, options?: { mock?: boolean; split?: boolean; baseURL?: string; apiFetchImportPath?: string; dryRun?: boolean }): FileInfo[] | void {
   const mock = options?.mock ?? true
   const split = options?.split ?? false
+  const dryRun = options?.dryRun ?? false
+  const baseURL = options?.baseURL
+  const apiFetchImportPath = options?.apiFetchImportPath
+
+  if (dryRun) {
+    return collectFileInfo(ir, outputDir, { mock, split, baseURL, apiFetchImportPath })
+  }
 
   if (split) {
-    writeSplit(ir, outputDir, mock)
+    writeSplit(ir, outputDir, mock, { baseURL })
   } else {
-    writeFlat(ir, outputDir, mock)
+    writeFlat(ir, outputDir, mock, { baseURL, apiFetchImportPath })
   }
 }
 
 export { writeGeneratedFiles }
+export type { FileInfo }

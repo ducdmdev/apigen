@@ -16,7 +16,7 @@ apigen is a standalone npm CLI that reads OpenAPI 3.0+ and Swagger 2.0 specs and
 ## Commands
 
 ```bash
-bun test          # run tests (87 tests across 13 files)
+bun test          # run tests (88 tests across 13 files)
 bun run typecheck # tsc --noEmit
 bun run build     # compile to dist/
 ```

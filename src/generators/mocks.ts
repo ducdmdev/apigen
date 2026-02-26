@@ -45,7 +45,10 @@ function fakerValueForField(name: string, type: string): string {
   if (lower === 'password' || lower === 'secret') return `'${faker.internet.password()}'`
   if (lower === 'avatar' || lower === 'image' || lower === 'photo' || lower === 'picture') return `'${faker.image.url()}'`
   if (lower === 'color' || lower === 'colour') return `'${faker.color.human()}'`
-  if (lower === 'createdat' || lower === 'updatedat' || lower === 'date' || lower === 'timestamp' || lower.endsWith('date') || lower.endsWith('at')) return `'${faker.date.recent().toISOString()}'`
+  if (lower === 'createdat' || lower === 'updatedat' || lower === 'date' || lower === 'timestamp' || lower.endsWith('date') || lower.endsWith('at')) {
+    if (type === 'number') return `${faker.date.recent().getTime()}`
+    return `'${faker.date.recent().toISOString()}'`
+  }
 
   // Type-based fallback
   switch (type) {

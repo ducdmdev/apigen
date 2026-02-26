@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { resolve } from 'path'
 import { loadSpec } from '../../src/loader'
 import { extractIR } from '../../src/ir'
+import type { IR } from '../../src/ir'
 import { generateMocks } from '../../src/generators/mocks'
 
 describe('generateMocks', () => {
@@ -55,6 +56,30 @@ describe('generateMocks', () => {
 
     const getByIdResponseMatches = output.match(/export const mockGetByIdBgInsuranceResponse/g)
     expect(getByIdResponseMatches).toHaveLength(1)
+  })
+
+  it('returns numeric timestamp for date-named fields with number type', () => {
+    const ir: IR = {
+      operations: [],
+      schemas: [{
+        name: 'Contract',
+        properties: [
+          { name: 'terminationDate', type: 'number', required: true, isArray: false, itemType: null, ref: null, enumValues: null },
+          { name: 'createdAt', type: 'number', required: true, isArray: false, itemType: null, ref: null, enumValues: null },
+          { name: 'startDate', type: 'string', required: true, isArray: false, itemType: null, ref: null, enumValues: null },
+        ],
+        required: ['terminationDate', 'createdAt', 'startDate'],
+      }],
+    }
+    const output = generateMocks(ir)
+
+    // number-typed date fields should get numeric values, not ISO strings
+    expect(output).toMatch(/terminationDate: \d+/)
+    expect(output).not.toMatch(/terminationDate: '/)
+    expect(output).toMatch(/createdAt: \d+/)
+    expect(output).not.toMatch(/createdAt: '/)
+    // string-typed date field should still get ISO string
+    expect(output).toMatch(/startDate: '/)
   })
 
   it('generates {} for object type and null as unknown for unknown type', () => {

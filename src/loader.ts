@@ -63,7 +63,7 @@ async function loadSpec(input: string): Promise<Record<string, unknown>> {
   try {
     parsed = input.endsWith('.json') ? JSON.parse(raw) : parseYaml(raw)
   } catch (err) {
-    throw new Error(`Failed to parse ${input}: ${(err as Error).message}`)
+    throw new Error(`Failed to parse ${input}: ${(err as Error).message}. Ensure the file is valid YAML or JSON.`)
   }
 
   const version = detectSpecVersion(parsed)

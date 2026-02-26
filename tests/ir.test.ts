@@ -388,7 +388,7 @@ describe('extractIR', () => {
     const spec = { components: { schemas: {} } }
     const ir = extractIR(spec as Record<string, unknown>)
     expect(ir.operations).toHaveLength(0)
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('0 operations'))
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("no 'paths'"))
     warnSpy.mockRestore()
   })
 })

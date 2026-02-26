@@ -59,4 +59,34 @@ describe('writeGeneratedFiles', () => {
       rmSync(outDir, { recursive: true })
     }
   })
+
+  it('passes baseURL to generated hooks when provided', async () => {
+    const spec = await loadSpec(resolve(__dirname, 'fixtures/petstore-oas3.yaml'))
+    const ir = extractIR(spec)
+    const outDir = mkdtempSync(join(tmpdir(), 'oqf-test-'))
+
+    try {
+      writeGeneratedFiles(ir, outDir, { mock: true, baseURL: 'https://api.example.com' })
+
+      const hooks = readFileSync(join(outDir, 'hooks.ts'), 'utf8')
+      expect(hooks).toContain('https://api.example.com')
+    } finally {
+      rmSync(outDir, { recursive: true })
+    }
+  })
+
+  it('passes baseURL to split mode api-fetch when provided', async () => {
+    const spec = await loadSpec(resolve(__dirname, 'fixtures/tagged-api.yaml'))
+    const ir = extractIR(spec)
+    const outDir = mkdtempSync(join(tmpdir(), 'oqf-test-'))
+
+    try {
+      writeGeneratedFiles(ir, outDir, { split: true, baseURL: 'https://api.example.com' })
+
+      const apiFetch = readFileSync(join(outDir, 'api-fetch.ts'), 'utf8')
+      expect(apiFetch).toContain('https://api.example.com')
+    } finally {
+      rmSync(outDir, { recursive: true })
+    }
+  })
 })

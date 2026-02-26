@@ -48,11 +48,11 @@ function buildSubsetIR(ops: IROperation[], allSchemas: IRSchema[]): IR {
   return { operations: ops, schemas }
 }
 
-function writeFlat(ir: IR, outputDir: string, mock: boolean): void {
+function writeFlat(ir: IR, outputDir: string, mock: boolean, opts?: { baseURL?: string; apiFetchImportPath?: string }): void {
   mkdirSync(outputDir, { recursive: true })
 
   writeFileSync(join(outputDir, 'types.ts'), generateTypes(ir), 'utf8')
-  writeFileSync(join(outputDir, 'hooks.ts'), generateHooks(ir, { mock }), 'utf8')
+  writeFileSync(join(outputDir, 'hooks.ts'), generateHooks(ir, { mock, baseURL: opts?.baseURL, apiFetchImportPath: opts?.apiFetchImportPath }), 'utf8')
   if (mock) {
     writeFileSync(join(outputDir, 'mocks.ts'), generateMocks(ir), 'utf8')
     writeFileSync(join(outputDir, 'test-mode-provider.tsx'), generateProvider(), 'utf8')
@@ -60,7 +60,7 @@ function writeFlat(ir: IR, outputDir: string, mock: boolean): void {
   writeFileSync(join(outputDir, 'index.ts'), generateIndexFile({ mock }), 'utf8')
 }
 
-function writeSplit(ir: IR, outputDir: string, mock: boolean): void {
+function writeSplit(ir: IR, outputDir: string, mock: boolean, opts?: { baseURL?: string }): void {
   mkdirSync(outputDir, { recursive: true })
 
   const groups = groupOperationsByTag(ir.operations)
@@ -72,7 +72,7 @@ function writeSplit(ir: IR, outputDir: string, mock: boolean): void {
   }
 
   // Write shared api-fetch at root
-  writeFileSync(join(outputDir, 'api-fetch.ts'), generateApiFetch(), 'utf8')
+  writeFileSync(join(outputDir, 'api-fetch.ts'), generateApiFetch({ baseURL: opts?.baseURL }), 'utf8')
 
   // Write per-tag feature folders
   for (const slug of tagSlugs) {
@@ -101,14 +101,16 @@ function writeSplit(ir: IR, outputDir: string, mock: boolean): void {
   )
 }
 
-function writeGeneratedFiles(ir: IR, outputDir: string, options?: { mock?: boolean; split?: boolean }): void {
+function writeGeneratedFiles(ir: IR, outputDir: string, options?: { mock?: boolean; split?: boolean; baseURL?: string; apiFetchImportPath?: string }): void {
   const mock = options?.mock ?? true
   const split = options?.split ?? false
+  const baseURL = options?.baseURL
+  const apiFetchImportPath = options?.apiFetchImportPath
 
   if (split) {
-    writeSplit(ir, outputDir, mock)
+    writeSplit(ir, outputDir, mock, { baseURL })
   } else {
-    writeFlat(ir, outputDir, mock)
+    writeFlat(ir, outputDir, mock, { baseURL, apiFetchImportPath })
   }
 }
 

@@ -181,8 +181,9 @@ function collectMockImports(ir: IR): string[] {
   return [...mocks]
 }
 
-function generateHooks(ir: IR, options?: { mock?: boolean }): string {
+function generateHooks(ir: IR, options?: { mock?: boolean; providerImportPath?: string }): string {
   const mock = options?.mock ?? true
+  const providerImportPath = options?.providerImportPath ?? './test-mode-provider'
   const parts: string[] = []
   const queryOps = ir.operations.filter(op => op.method === 'get')
   const mutationOps = ir.operations.filter(op => op.method !== 'get')
@@ -199,7 +200,7 @@ function generateHooks(ir: IR, options?: { mock?: boolean }): string {
   parts.push(`import { ${tanstackImports.join(', ')} } from '@tanstack/react-query'`)
   if (mock) {
     const mockImports = collectMockImports(ir)
-    parts.push(`import { useApiTestMode } from './test-mode-provider'`)
+    parts.push(`import { useApiTestMode } from '${providerImportPath}'`)
     parts.push(`import { ${mockImports.join(', ')} } from './mocks'`)
   }
   if (typeImports.length > 0) {

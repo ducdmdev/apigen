@@ -98,6 +98,87 @@ describe('e2e: inline schemas (masterdata-style)', () => {
   })
 })
 
+describe('e2e: --split flag', () => {
+  it('generates per-tag feature folders when split is enabled', async () => {
+    const spec = await loadSpec(resolve(__dirname, 'fixtures/tagged-api.yaml'))
+    const ir = extractIR(spec)
+    const outDir = mkdtempSync(join(tmpdir(), 'oqf-e2e-'))
+
+    try {
+      writeGeneratedFiles(ir, outDir, { split: true })
+
+      // Root should have test-mode-provider and root index
+      expect(existsSync(join(outDir, 'test-mode-provider.tsx'))).toBe(true)
+      expect(existsSync(join(outDir, 'index.ts'))).toBe(true)
+
+      // Should NOT have flat types/hooks/mocks at root
+      expect(existsSync(join(outDir, 'types.ts'))).toBe(false)
+      expect(existsSync(join(outDir, 'hooks.ts'))).toBe(false)
+      expect(existsSync(join(outDir, 'mocks.ts'))).toBe(false)
+
+      // Users tag folder
+      expect(existsSync(join(outDir, 'users', 'types.ts'))).toBe(true)
+      expect(existsSync(join(outDir, 'users', 'hooks.ts'))).toBe(true)
+      expect(existsSync(join(outDir, 'users', 'mocks.ts'))).toBe(true)
+      expect(existsSync(join(outDir, 'users', 'index.ts'))).toBe(true)
+
+      const usersTypes = readFileSync(join(outDir, 'users', 'types.ts'), 'utf8')
+      expect(usersTypes).toContain('export interface User')
+      expect(usersTypes).not.toContain('export interface Post')
+
+      const usersHooks = readFileSync(join(outDir, 'users', 'hooks.ts'), 'utf8')
+      expect(usersHooks).toContain('useListUsers')
+      expect(usersHooks).toContain('useCreateUser')
+      expect(usersHooks).not.toContain('useListPosts')
+      // Hooks import provider from parent directory
+      expect(usersHooks).toContain("from '../test-mode-provider'")
+
+      // Posts tag folder
+      expect(existsSync(join(outDir, 'posts', 'types.ts'))).toBe(true)
+      const postsHooks = readFileSync(join(outDir, 'posts', 'hooks.ts'), 'utf8')
+      expect(postsHooks).toContain('useListPosts')
+      expect(postsHooks).not.toContain('useListUsers')
+
+      // Common folder for untagged operations
+      expect(existsSync(join(outDir, 'common', 'hooks.ts'))).toBe(true)
+      const commonHooks = readFileSync(join(outDir, 'common', 'hooks.ts'), 'utf8')
+      expect(commonHooks).toContain('useHealthCheck')
+
+      // Root index re-exports all feature folders
+      const rootIndex = readFileSync(join(outDir, 'index.ts'), 'utf8')
+      expect(rootIndex).toContain("export * from './common'")
+      expect(rootIndex).toContain("export * from './posts'")
+      expect(rootIndex).toContain("export * from './users'")
+      expect(rootIndex).toContain("export * from './test-mode-provider'")
+    } finally {
+      rmSync(outDir, { recursive: true })
+    }
+  })
+
+  it('generates split output without mocks when mock is false', async () => {
+    const spec = await loadSpec(resolve(__dirname, 'fixtures/tagged-api.yaml'))
+    const ir = extractIR(spec)
+    const outDir = mkdtempSync(join(tmpdir(), 'oqf-e2e-'))
+
+    try {
+      writeGeneratedFiles(ir, outDir, { split: true, mock: false })
+
+      // Root should not have provider
+      expect(existsSync(join(outDir, 'test-mode-provider.tsx'))).toBe(false)
+
+      // Feature folders have types and hooks but no mocks
+      expect(existsSync(join(outDir, 'users', 'types.ts'))).toBe(true)
+      expect(existsSync(join(outDir, 'users', 'hooks.ts'))).toBe(true)
+      expect(existsSync(join(outDir, 'users', 'mocks.ts'))).toBe(false)
+
+      const hooks = readFileSync(join(outDir, 'users', 'hooks.ts'), 'utf8')
+      expect(hooks).not.toContain('useApiTestMode')
+    } finally {
+      rmSync(outDir, { recursive: true })
+    }
+  })
+})
+
 describe('e2e: --no-mock flag', () => {
   it('generates only types, hooks, and index when mock is false', async () => {
     const spec = await loadSpec(resolve(__dirname, 'fixtures/petstore-oas3.yaml'))

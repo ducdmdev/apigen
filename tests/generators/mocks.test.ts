@@ -5,14 +5,17 @@ import { extractIR } from '../../src/ir'
 import { generateMocks } from '../../src/generators/mocks'
 
 describe('generateMocks', () => {
-  it('generates mock constants for schemas', async () => {
+  it('generates mock constants for schemas with realistic values', async () => {
     const spec = await loadSpec(resolve(__dirname, '../fixtures/petstore-oas3.yaml'))
     const ir = extractIR(spec)
     const output = generateMocks(ir)
 
     expect(output).toContain('export const mockPet: Pet')
-    expect(output).toContain('id: 1')
-    expect(output).toContain("name: 'string'")
+    // id field should get a UUID (faker heuristic for "id")
+    expect(output).toMatch(/id: '[0-9a-f-]+'/)
+    // name field should get a realistic name (not 'string')
+    expect(output).not.toContain("name: 'string'")
+    expect(output).toContain('name:')
   })
 
   it('generates mock response data for operations', async () => {
@@ -39,5 +42,36 @@ describe('generateMocks', () => {
 
     expect(output).not.toContain('import type')
     expect(output).not.toContain('import type {  }')
+  })
+
+  it('does not emit duplicate response mocks for inline schemas', async () => {
+    const spec = await loadSpec(resolve(__dirname, '../fixtures/inline-schemas.yaml'))
+    const ir = extractIR(spec)
+    const output = generateMocks(ir)
+
+    // Should have exactly one declaration of each mock
+    const searchResponseMatches = output.match(/export const mockSearchBgInsuranceResponse/g)
+    expect(searchResponseMatches).toHaveLength(1)
+
+    const getByIdResponseMatches = output.match(/export const mockGetByIdBgInsuranceResponse/g)
+    expect(getByIdResponseMatches).toHaveLength(1)
+  })
+
+  it('generates {} for object type and null as unknown for unknown type', () => {
+    const ir = {
+      operations: [],
+      schemas: [{
+        name: 'TestSchema',
+        properties: [
+          { name: 'data', type: 'object', required: true, isArray: false, itemType: null, ref: null, enumValues: null },
+          { name: 'meta', type: 'unknown', required: false, isArray: false, itemType: null, ref: null, enumValues: null },
+        ],
+        required: ['data'],
+      }],
+    }
+    const output = generateMocks(ir)
+
+    expect(output).toContain('data: {},')
+    expect(output).toContain('meta: null as unknown,')
   })
 })

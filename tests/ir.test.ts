@@ -270,6 +270,44 @@ describe('extractIR', () => {
     expect(ids).toContain('searchUsers')
   })
 
+  it('detects circular references and breaks the cycle', () => {
+    const spec = {
+      paths: {},
+      components: {
+        schemas: {
+          User: {
+            type: 'object',
+            required: ['id'],
+            properties: {
+              id: { type: 'string' },
+              manager: { $ref: '#/components/schemas/User' },
+            },
+          },
+          Node: {
+            type: 'object',
+            properties: {
+              value: { type: 'string' },
+              children: { type: 'array', items: { $ref: '#/components/schemas/Node' } },
+            },
+          },
+        },
+      },
+    }
+    const ir = extractIR(spec as Record<string, unknown>)
+
+    // Should complete without infinite loop
+    expect(ir.schemas).toHaveLength(2)
+
+    const user = ir.schemas.find(s => s.name === 'User')
+    expect(user).toBeDefined()
+    expect(user!.properties.find(p => p.name === 'manager')!.ref).toBe('#/components/schemas/User')
+
+    const node = ir.schemas.find(s => s.name === 'Node')
+    expect(node).toBeDefined()
+    const children = node!.properties.find(p => p.name === 'children')!
+    expect(children.isArray).toBe(true)
+  })
+
   it('resolves anyOf nullable types to base type', () => {
     const spec = {
       paths: {

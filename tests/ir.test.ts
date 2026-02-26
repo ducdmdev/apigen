@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { resolve } from 'path'
 import { loadSpec } from '../src/loader'
 import { extractIR } from '../src/ir'
@@ -381,5 +381,14 @@ describe('extractIR', () => {
     expect(bodySchema!.properties.find(p => p.name === 'name')!.type).toBe('string')
     expect(bodySchema!.properties.find(p => p.name === 'code')!.type).toBe('string')
     expect(bodySchema!.properties.find(p => p.name === 'count')!.type).toBe('number')
+  })
+
+  it('warns when spec has no paths', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const spec = { components: { schemas: {} } }
+    const ir = extractIR(spec as Record<string, unknown>)
+    expect(ir.operations).toHaveLength(0)
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('0 operations'))
+    warnSpy.mockRestore()
   })
 })

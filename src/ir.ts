@@ -239,6 +239,11 @@ function resolveAllOf(
 
 function extractIR(spec: Record<string, unknown>): IR {
   const paths = (spec.paths ?? {}) as Record<string, Record<string, unknown>>
+
+  if (Object.keys(paths).length === 0) {
+    console.warn("Warning: Spec has no 'paths' -- 0 operations will be extracted.")
+  }
+
   const components = (spec.components ?? {}) as Record<string, unknown>
   const schemasDef = (components.schemas ?? {}) as Record<string, Record<string, unknown>>
 

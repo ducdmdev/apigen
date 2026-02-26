@@ -92,9 +92,12 @@ apigen generate -i ./openapi.yaml
 
 | Flag                     | Required | Default                 | Description                                          |
 |--------------------------|----------|-------------------------|------------------------------------------------------|
-| `-i, --input <path>`     | Yes      | --                      | Path to the OpenAPI or Swagger spec file.            |
+| `-i, --input <path>`     | No       | *(interactive prompt)*  | Path or URL to the OpenAPI or Swagger spec file. When omitted, shows an interactive prompt. |
 | `-o, --output <path>`    | No       | `./src/api/generated`   | Output directory for generated files.                |
 | `--no-mock`              | No       | (mock enabled)          | Skip mock data generation.                           |
+| `--split`                | No       | (disabled)              | Split output into per-tag feature folders.           |
+
+> **Interactive mode:** When `-i` is omitted, apigen prompts you to choose between providing a local file path, a direct URL, or auto-discovering a spec from a base URL (tries well-known paths like `/v3/api-docs`, `/swagger.json`, `/openapi.json`).
 
 **Examples**
 
@@ -116,6 +119,8 @@ apigen generate -i ./spec.json -o ./src/generated --no-mock
 | `test-mode-provider.tsx` | React context provider to switch hooks to mock mode.         |
 | `index.ts`               | Barrel file re-exporting all generated modules.              |
 
+> When `--no-mock` is used, `mocks.ts` and `test-mode-provider.tsx` are not generated. When `--split` is used, output is organized into per-tag subdirectories.
+
 ---
 
 ## Internal modules
@@ -125,6 +130,7 @@ The following modules are implementation details and are **not** part of the pub
 - **loader** (`src/loader.ts`) -- reads and normalizes OpenAPI/Swagger specs.
 - **ir** (`src/ir.ts`) -- extracts an intermediate representation from a parsed spec.
 - **generators** (`src/generators/`) -- emit TypeScript source strings from the IR.
+- **discover** (`src/discover.ts`) -- auto-discovers API specs at well-known paths.
 - **writer** (`src/writer.ts`) -- writes generator output to disk.
 
 These may change without notice between versions. Import only from the package entrypoint (`apigen`).

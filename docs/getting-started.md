@@ -7,7 +7,7 @@ Generate type-safe TanStack Query hooks from your OpenAPI/Swagger specs in under
 - **Node.js** >= 18
 - **bun** (used for building the package)
 - A consuming project with:
-  - `react` ^18
+  - `react` ^18 or ^19
   - `@tanstack/react-query` ^5
 
 ## Install
@@ -21,21 +21,49 @@ npm install --save-dev apigen
 ### CLI usage
 
 ```bash
+# From a local file
 npx apigen generate --input ./openapi.yaml --output ./src/api/generated
+
+# From a URL
+npx apigen generate -i https://api.example.com/openapi.json
+
+# Interactive mode (omit -i to be prompted)
+npx apigen generate
 ```
 
-That reads your OpenAPI 3.x or Swagger 2.0 spec (YAML or JSON), and writes generated files to `./src/api/generated`.
+That reads your OpenAPI 3.x or Swagger 2.0 spec (YAML or JSON, local file or URL), and writes generated files to `./src/api/generated`.
+
+When `-i` is omitted, an interactive prompt guides you through three options: local file path, direct URL, or auto-discover from a base URL.
 
 ## Generated Output Structure
+
+### Flat output (default)
 
 ```
 src/api/generated/
   index.ts                 # Re-exports everything
   types.ts                 # TypeScript interfaces from schema definitions + param types
   hooks.ts                 # useQuery / useMutation hooks per operation
-  mocks.ts                 # Mock data for every schema and response
-  test-mode-provider.tsx   # React context to toggle mock mode
+  mocks.ts                 # Mock data for every schema and response (when mock enabled)
+  test-mode-provider.tsx   # React context to toggle mock mode (when mock enabled)
 ```
+
+### Split output (`--split`)
+
+```
+src/api/generated/
+  index.ts                 # Re-exports all feature folders
+  test-mode-provider.tsx   # Shared provider (when mock enabled)
+  pets/
+    types.ts               # Types for pet operations only
+    hooks.ts               # Hooks for pet operations only
+    mocks.ts               # Mocks for pet operations only (when mock enabled)
+    index.ts               # Barrel for this feature
+  users/
+    ...
+```
+
+Use `--split` to organize output by API tag into per-feature folders.
 
 ### What each file does
 

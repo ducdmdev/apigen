@@ -23,6 +23,7 @@ src/
   cli.ts                Commander-based CLI (apigen generate)
   loader.ts             Reads YAML/JSON specs, converts Swagger 2 to OpenAPI 3
   ir.ts                 Extracts an intermediate representation from a parsed spec
+  discover.ts           Auto-discovers API specs at well-known paths
   writer.ts             Orchestrates generators and writes files to disk
   generators/
     types.ts            Emits TypeScript interfaces for schemas and params
@@ -39,6 +40,7 @@ tests/
   ir.test.ts
   writer.test.ts
   cli.test.ts
+  discover.test.ts
   e2e.test.ts
   generators/
     types.test.ts

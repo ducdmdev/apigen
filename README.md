@@ -39,6 +39,10 @@ function PetList() {
 - **Mock data + test mode** — static mocks and a React context provider to toggle them on
 - **Swagger 2.0 support** — auto-converted to OpenAPI 3.x
 - **Flat or split output** — single directory or split by API tag with `--split`
+- **Config file support** — `apigen.config.ts` with auto-discovery or `--config` flag
+- **Interactive wizard** — run without flags to be guided through setup
+- **allOf composition** — schema merging for specs using `allOf`
+- **Dry-run mode** — preview generated files with `--dry-run` before writing
 
 ## Install
 
@@ -49,7 +53,17 @@ npm install -D apigen-tanstack
 ## Usage
 
 ```bash
+# From a local file
 npx apigen-tanstack generate --input ./openapi.yaml --output ./src/api/generated
+
+# From a config file
+npx apigen-tanstack generate --config apigen.config.ts
+
+# Interactive mode (omit flags to be guided through setup)
+npx apigen-tanstack generate
+
+# Preview without writing
+npx apigen-tanstack generate -i ./openapi.yaml --dry-run
 ```
 
 ## Generated Files

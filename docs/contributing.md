@@ -47,9 +47,14 @@ tests/
     hooks.test.ts
     mocks.test.ts
     provider.test.ts
+    api-fetch.test.ts
+    index-file.test.ts
   fixtures/
     petstore-oas3.yaml
     petstore-swagger2.yaml
+    inline-schemas.yaml
+    tagged-api.yaml
+    allof-composition.yaml
 ```
 
 ## Scripts

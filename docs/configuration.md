@@ -8,30 +8,40 @@ Use `defineConfig` in a TypeScript config file to get type-checked configuration
 
 ```ts
 // apigen.config.ts
-import { defineConfig } from 'apigen'
+import { defineConfig } from 'apigen-tanstack'
 
 export default defineConfig({
   input: './specs/petstore.yaml',
   output: './src/api/generated',
   mock: true,
+  split: false,
+  baseURL: 'https://api.example.com',
 })
 ```
 
 `defineConfig` accepts a `ConfigInput` object and returns a fully resolved `Config` with defaults applied. It is a pure helper for type safety -- it does not read files or trigger generation.
 
+The CLI auto-searches for `apigen.config.ts` or `apigen.config.js` in the current directory when no `--config` flag is provided.
+
 ### Type signature
 
 ```ts
 interface ConfigInput {
-  input: string       // required
-  output?: string     // optional, defaults to './src/api/generated'
-  mock?: boolean      // optional, defaults to true
+  input: string                  // required
+  output?: string                // optional, defaults to './src/api/generated'
+  mock?: boolean                 // optional, defaults to true
+  split?: boolean                // optional, defaults to false
+  baseURL?: string               // optional, prefix for all fetch paths
+  apiFetchImportPath?: string    // optional, custom import path for apiFetch
 }
 
 interface Config {
   input: string
   output: string
   mock: boolean
+  split: boolean
+  baseURL?: string
+  apiFetchImportPath?: string
 }
 
 function defineConfig(config: ConfigInput): Config
@@ -89,6 +99,54 @@ defineConfig({
 
 > **Note:** When `mock` is `false`, the `mocks.ts` and `test-mode-provider.tsx` files are not generated, and hooks do not include test mode logic.
 
+### `split`
+
+Split generated output into per-tag feature folders. Each tag gets its own directory with `types.ts`, `hooks.ts`, `mocks.ts`, and `index.ts`.
+
+| | |
+|---|---|
+| **Type** | `boolean` |
+| **Default** | `false` |
+
+```ts
+defineConfig({
+  input: './openapi.yaml',
+  split: true,
+})
+```
+
+### `baseURL`
+
+Base URL prefix for all generated fetch paths. When set, the generated `apiFetch` helper prepends this URL to every request path.
+
+| | |
+|---|---|
+| **Type** | `string` |
+| **Default** | *(none — paths are relative)* |
+
+```ts
+defineConfig({
+  input: './openapi.yaml',
+  baseURL: 'https://api.example.com',
+})
+```
+
+### `apiFetchImportPath`
+
+Custom import path for the `apiFetch` function. Use this when you have your own fetch wrapper and want generated hooks to import from it instead of using the built-in one.
+
+| | |
+|---|---|
+| **Type** | `string` |
+| **Default** | *(none — uses built-in apiFetch)* |
+
+```ts
+defineConfig({
+  input: './openapi.yaml',
+  apiFetchImportPath: '../lib/api-client',
+})
+```
+
 ## CLI Flags
 
 ```bash
@@ -128,12 +186,38 @@ Split generated output into per-tag feature folders. Each tag gets its own direc
 npx apigen generate -i ./openapi.yaml --split
 ```
 
+### `--config` / `-c`
+
+Path to a config file. When omitted, the CLI searches for `apigen.config.ts` or `apigen.config.js` in the current directory.
+
+```bash
+npx apigen generate --config ./config/apigen.config.ts
+npx apigen generate -c apigen.config.ts
+```
+
+### `--base-url`
+
+Base URL prefix for all generated fetch paths. Overrides the `baseURL` config option.
+
+```bash
+npx apigen generate -i ./openapi.yaml --base-url https://api.example.com
+```
+
+### `--dry-run`
+
+Preview the files that would be generated (with sizes) without writing anything. In a TTY, you are prompted to proceed after the preview. In non-TTY (CI), it prints and exits.
+
+```bash
+npx apigen generate -i ./openapi.yaml --dry-run
+```
+
 ### Full example
 
 ```bash
 npx apigen generate \
   --input ./specs/petstore.yaml \
   --output ./src/api \
+  --base-url https://api.example.com \
   --no-mock \
   --split
 ```
@@ -173,3 +257,7 @@ The output directory contains these files (mocks and provider are omitted when `
 | `output` | `--output` / `-o` | `./src/api/generated` |
 | `mock` | `--no-mock` to disable | `true` |
 | `split` | `--split` | `false` |
+| `baseURL` | `--base-url` | *(none)* |
+| `apiFetchImportPath` | *(config only)* | *(none)* |
+| — | `--config` / `-c` | *(auto-searches for apigen.config.ts)* |
+| — | `--dry-run` | *(disabled)* |

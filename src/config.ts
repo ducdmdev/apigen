@@ -2,12 +2,18 @@ interface Config {
   input: string
   output: string
   mock: boolean
+  split: boolean
+  baseURL?: string
+  apiFetchImportPath?: string
 }
 
 interface ConfigInput {
   input: string
   output?: string
   mock?: boolean
+  split?: boolean
+  baseURL?: string
+  apiFetchImportPath?: string
 }
 
 function defineConfig(config: ConfigInput): Config {
@@ -19,6 +25,9 @@ function resolveConfig(input: ConfigInput): Config {
     input: input.input,
     output: input.output ?? './src/api/generated',
     mock: input.mock ?? true,
+    split: input.split ?? false,
+    baseURL: input.baseURL,
+    apiFetchImportPath: input.apiFetchImportPath,
   }
 }
 

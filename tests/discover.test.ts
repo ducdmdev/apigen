@@ -99,6 +99,67 @@ describe('discoverSpec', () => {
     expect(result.url).toBe(`${baseUrl}/v3/api-docs`)
   })
 
+  it('discovers spec from YAML response', async () => {
+    const yamlServer = createServer((req, res) => {
+      if (req.url === '/openapi.json') {
+        res.writeHead(200, { 'Content-Type': 'text/yaml' })
+        res.end('openapi: "3.0.3"\ninfo:\n  title: Test\n  version: "1.0"\npaths: {}')
+      } else {
+        res.writeHead(404)
+        res.end('Not Found')
+      }
+    })
+
+    const yamlBaseUrl = await new Promise<string>((resolve) => {
+      yamlServer.listen(0, '127.0.0.1', () => {
+        const addr = yamlServer.address()
+        if (addr && typeof addr === 'object') {
+          resolve(`http://127.0.0.1:${addr.port}`)
+        }
+      })
+    })
+
+    try {
+      const result = await discoverSpec(yamlBaseUrl)
+      expect(result.url).toBe(`${yamlBaseUrl}/openapi.json`)
+      expect(result.version).toBe('openapi3')
+    } finally {
+      yamlServer.close()
+    }
+  })
+
+  it('skips 200 responses with invalid content', async () => {
+    const invalidServer = createServer((req, res) => {
+      if (req.url === '/v3/api-docs') {
+        res.writeHead(200, { 'Content-Type': 'text/html' })
+        res.end('<html><body>Not a spec</body></html>')
+      } else if (req.url === '/swagger.json') {
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ swagger: '2.0', info: { title: 'Test', version: '1.0' }, paths: {} }))
+      } else {
+        res.writeHead(404)
+        res.end('Not Found')
+      }
+    })
+
+    const invalidBaseUrl = await new Promise<string>((resolve) => {
+      invalidServer.listen(0, '127.0.0.1', () => {
+        const addr = invalidServer.address()
+        if (addr && typeof addr === 'object') {
+          resolve(`http://127.0.0.1:${addr.port}`)
+        }
+      })
+    })
+
+    try {
+      const result = await discoverSpec(invalidBaseUrl)
+      expect(result.url).toBe(`${invalidBaseUrl}/swagger.json`)
+      expect(result.version).toBe('swagger2')
+    } finally {
+      invalidServer.close()
+    }
+  })
+
   it('exports the well-known paths list', () => {
     expect(WELL_KNOWN_PATHS).toEqual([
       '/v3/api-docs',

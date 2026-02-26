@@ -50,6 +50,12 @@ function fakerValueForField(name: string, type: string): string {
     return `'${faker.date.recent().toISOString()}'`
   }
 
+  // Handle union types by using the first variant
+  if (type.includes(' | ')) {
+    const firstType = type.split(' | ')[0].trim()
+    return fakerValueForField(name, firstType)
+  }
+
   // Type-based fallback
   switch (type) {
     case 'string': return `'${faker.lorem.word()}'`

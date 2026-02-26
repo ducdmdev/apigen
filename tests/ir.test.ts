@@ -224,6 +224,38 @@ describe('extractIR', () => {
     expect(includeField.itemType).toBe('string')
   })
 
+  it('resolves anyOf with multiple distinct types to union type', () => {
+    const spec = {
+      paths: {
+        '/items': {
+          post: {
+            operationId: 'createFlexItem',
+            requestBody: {
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      value: { anyOf: [{ type: 'string' }, { type: 'boolean' }] },
+                      data: { anyOf: [{ type: 'number' }, { type: 'string' }, { type: 'boolean' }] },
+                    },
+                  },
+                },
+              },
+            },
+            responses: { '200': { description: 'ok' } },
+          },
+        },
+      },
+      components: { schemas: {} },
+    }
+    const ir = extractIR(spec as Record<string, unknown>)
+    const bodySchema = ir.schemas.find(s => s.name === 'CreateFlexItemBody')
+    expect(bodySchema).toBeDefined()
+    expect(bodySchema!.properties.find(p => p.name === 'value')!.type).toBe('string | boolean')
+    expect(bodySchema!.properties.find(p => p.name === 'data')!.type).toBe('number | string | boolean')
+  })
+
   it('resolves anyOf nullable types to base type', () => {
     const spec = {
       paths: {

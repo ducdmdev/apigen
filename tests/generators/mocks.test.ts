@@ -82,6 +82,22 @@ describe('generateMocks', () => {
     expect(output).toMatch(/startDate: '/)
   })
 
+  it('generates mock value for union type by using first variant', () => {
+    const ir: IR = {
+      operations: [],
+      schemas: [{
+        name: 'FlexItem',
+        properties: [
+          { name: 'value', type: 'string | boolean', required: true, isArray: false, itemType: null, ref: null, enumValues: null },
+        ],
+        required: ['value'],
+      }],
+    }
+    const output = generateMocks(ir)
+    // Should pick first variant (string), not fall through to 'null as unknown'
+    expect(output).not.toContain('null as unknown')
+  })
+
   it('generates {} for object type and null as unknown for unknown type', () => {
     const ir = {
       operations: [],

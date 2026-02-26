@@ -63,7 +63,7 @@ function mapOpenApiType(schema: Record<string, unknown>): string {
     // Zod pattern: anyOf [string, array<string>] → treat as array
     const hasArray = realTypes.find(v => v.type === 'array')
     if (hasArray && realTypes.length === 2) return 'array'
-    return 'unknown'
+    return mapped.join(' | ')
   }
 
   const type = schema.type as string | undefined

@@ -256,7 +256,7 @@ describe('extractIR', () => {
     expect(bodySchema!.properties.find(p => p.name === 'data')!.type).toBe('number | string | boolean')
   })
 
-  it('skips version segment in operationId generation', () => {
+  it('skips version segment in operationId generation and appends version suffix', () => {
     const spec = {
       paths: {
         '/masterdata/sdkrw/v2/get-by-query': { post: { responses: { '200': { description: 'ok' } } } },
@@ -266,7 +266,7 @@ describe('extractIR', () => {
     }
     const ir = extractIR(spec as Record<string, unknown>)
     const ids = ir.operations.map(op => op.operationId)
-    expect(ids).toContain('getByQuerySdkrw')
+    expect(ids).toContain('getByQuerySdkrwV2')
     expect(ids).toContain('searchUsers')
   })
 

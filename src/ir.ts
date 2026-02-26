@@ -104,12 +104,14 @@ function generateOperationId(method: string, path: string): string {
 
   if (action && segments.length >= 2) {
     let resourceIndex = segments.length - 2
+    let versionSuffix = ''
     // Skip version-like segments (v1, v2, etc.) to find the real resource name
     if (/^v\d+$/i.test(segments[resourceIndex]) && resourceIndex > 0) {
+      versionSuffix = kebabToPascal(segments[resourceIndex])
       resourceIndex--
     }
     const resource = kebabToPascal(segments[resourceIndex])
-    return `${action}${resource}`
+    return `${action}${resource}${versionSuffix}`
   }
 
   // No known action suffix — use method as verb

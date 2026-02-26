@@ -4,10 +4,11 @@ import { Command } from 'commander'
 import { resolve, dirname, join } from 'path'
 import { existsSync, readFileSync } from 'fs'
 import { fileURLToPath, pathToFileURL } from 'url'
-import { select, input } from '@inquirer/prompts'
+import { select, input, confirm } from '@inquirer/prompts'
 import { loadSpec } from './loader'
 import { extractIR } from './ir'
 import { writeGeneratedFiles } from './writer'
+import type { FileInfo } from './writer'
 import { discoverSpec } from './discover'
 import { resolveConfig } from './config'
 import type { ConfigInput } from './config'
@@ -87,7 +88,8 @@ program
   .option('--split', 'Split output into per-tag feature folders')
   .option('-c, --config <path>', 'Path to config file (searches for apigen.config.ts by default)')
   .option('--base-url <url>', 'Base URL prefix for all API fetch paths')
-  .action(async (options: { input?: string; output: string; mock: boolean; split?: boolean; config?: string; baseUrl?: string }) => {
+  .option('--dry-run', 'Preview files that would be generated without writing')
+  .action(async (options: { input?: string; output: string; mock: boolean; split?: boolean; config?: string; baseUrl?: string; dryRun?: boolean }) => {
     // Load config file (explicit or auto-search)
     let fileConfig: ConfigInput | null = null
     if (options.config) {
@@ -121,6 +123,45 @@ program
     const ir = extractIR(spec)
 
     console.log(`Found ${ir.operations.length} operations, ${ir.schemas.length} schemas`)
+
+    if (options.dryRun) {
+      const files = writeGeneratedFiles(ir, outputPath, {
+        mock: config.mock,
+        split: config.split,
+        baseURL: config.baseURL,
+        apiFetchImportPath: config.apiFetchImportPath,
+        dryRun: true,
+      }) as FileInfo[]
+      const totalSize = files.reduce((sum, f) => sum + f.size, 0)
+
+      console.log('\nDry run — files that would be generated:\n')
+      for (const f of files) {
+        const sizeStr = f.size > 1024 ? `${(f.size / 1024).toFixed(1)} KB` : `${f.size} B`
+        console.log(`  ${f.path}  (${sizeStr})`)
+      }
+      const totalStr = totalSize > 1024 ? `${(totalSize / 1024).toFixed(1)} KB` : `${totalSize} B`
+      console.log(`\n  Total: ${files.length} files, ${totalStr}\n`)
+
+      // In non-TTY (CI), just print and exit
+      if (!process.stdin.isTTY) return
+
+      // In TTY, ask to proceed
+      const proceed = await confirm({ message: 'Proceed with generation?' })
+      if (!proceed) {
+        console.log('Cancelled.')
+        return
+      }
+
+      // User said yes — do the actual write
+      writeGeneratedFiles(ir, outputPath, {
+        mock: config.mock,
+        split: config.split,
+        baseURL: config.baseURL,
+        apiFetchImportPath: config.apiFetchImportPath,
+      })
+      console.log(`Generated files written to ${outputPath}`)
+      return
+    }
 
     writeGeneratedFiles(ir, outputPath, {
       mock: config.mock,
